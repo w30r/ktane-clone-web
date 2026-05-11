@@ -36,10 +36,508 @@ export type PasswordConfig = {
   solved: boolean;
 };
 
+export type KeypadSymbol = 
+  | 'balloon' | 'copyright' | 'doublek' | 'euro' | 'filledstar' 
+  | 'hollowstar' | 'hookn' | 'meltedthree' | 'omega' | 'paragraph'
+  | 'pitchfork' | 'press' | 'six' | 'smileyface' | 'squidknife'
+  | 'squigglyn' | 'tracks' | 'trident' | 'upsidedowny' | 'whirl'
+  | 'wrench' | 'at' | 'ae' | 'cursive' | 'rightc' | 'leftc'
+  | 'questionmark' | 'dragon' | 'nwithhat' | 'bt' | 'pumpkin';
+
+export type KeypadConfig = {
+  symbols: KeypadSymbol[];
+  column: KeypadSymbol[];
+  solved: boolean;
+  pressed: number;
+};
+
+export type WhosOnFirstConfig = {
+  display: string;
+  buttons: string[];
+  solved: boolean;
+  stage: number;
+};
+
+export type MemoryConfig = {
+  display: number;
+  buttons: string[];
+  stage: number;
+  solved: boolean;
+  pressedLabels: string[];
+  pressedPositions: number[];
+};
+
+export type MorseCodeConfig = {
+  word: string;
+  frequency: number;
+  solved: boolean;
+};
+
+export type ComplicatedWire = {
+  color: 'red' | 'blue' | 'yellow' | 'white' | 'black';
+  hasLED: boolean;
+  hasStar: boolean;
+  cut: boolean;
+};
+
+export type ComplicatedWiresConfig = {
+  wires: ComplicatedWire[];
+  solved: boolean;
+};
+
+export type WireSequenceWire = {
+  color: 'red' | 'blue' | 'black';
+  fromPosition: number;
+  toLetter: 'A' | 'B' | 'C';
+  cut?: boolean;
+};
+
+export type WireSequencePanel = {
+  letter: 'A' | 'B' | 'C';
+  wires: WireSequenceWire[];
+};
+
+export type WireSequencesConfig = {
+  panels: WireSequencePanel[];
+  currentPanel: number;
+  currentWire: number;
+  solved: boolean;
+  cutWires: string[];
+};
+
+const PANEL_LETTERS: ('A' | 'B' | 'C')[] = ['A', 'B', 'C'];
+const WIRE_COLORS: ('red' | 'blue' | 'black')[] = ['red', 'blue', 'black'];
+
+export function generateWireSequences(): WireSequencesConfig {
+  const panels: WireSequencePanel[] = [];
+  const nextLetters: ('A' | 'B' | 'C')[] = ['A', 'B', 'C'];
+  
+  for (let i = 0; i < 3; i++) {
+    const numWires = 3 + Math.floor(Math.random() * 4);
+    const wires: WireSequenceWire[] = [];
+    for (let j = 0; j < numWires; j++) {
+      wires.push({
+        color: randomItem(WIRE_COLORS),
+        fromPosition: Math.floor(Math.random() * 3),
+        toLetter: nextLetters[i],
+      });
+    }
+    panels.push({
+      letter: PANEL_LETTERS[i],
+      wires,
+    });
+  }
+  
+  return {
+    panels,
+    currentPanel: 0,
+    currentWire: 0,
+    solved: false,
+    cutWires: [],
+  };
+}
+
+export function getWireSequenceSolution(
+  panel: 'A' | 'B' | 'C',
+  wireColor: 'red' | 'blue' | 'black',
+  cutWires: string[]
+): { cut: boolean; message: string } {
+  const colorCount = cutWires.filter(c => c === wireColor).length;
+  const occurrence = colorCount + 1;
+  
+  const redRules: Record<number, string[]> = {
+    1: ['C'],
+    2: ['B'],
+    3: ['A'],
+    4: ['A', 'C'],
+    5: ['B'],
+    6: ['A', 'C'],
+    7: ['A', 'B', 'C'],
+    8: ['A', 'B'],
+    9: ['B'],
+  };
+  
+  const blueRules: Record<number, string[]> = {
+    1: ['B'],
+    2: ['A', 'C'],
+    3: ['B'],
+    4: ['A'],
+    5: ['B'],
+    6: ['B', 'C'],
+    7: ['C'],
+    8: ['A', 'C'],
+    9: ['A'],
+  };
+  
+  const blackRules: Record<number, string[]> = {
+    1: ['A', 'B', 'C'],
+    2: ['A', 'C'],
+    3: ['B'],
+    4: ['A', 'C'],
+    5: ['B'],
+    6: ['B', 'C'],
+    7: ['A', 'B'],
+    8: ['C'],
+    9: ['C'],
+  };
+  
+  let validTerminals: string[];
+  if (wireColor === 'red') {
+    validTerminals = redRules[occurrence] || [];
+  } else if (wireColor === 'blue') {
+    validTerminals = blueRules[occurrence] || [];
+  } else {
+    validTerminals = blackRules[occurrence] || [];
+  }
+  
+  const shouldCut = validTerminals.includes(panel);
+  return { cut: shouldCut, message: shouldCut ? `Cut (${occurrence}${getOrdinal(occurrence)} ${wireColor}, panel ${panel})` : 'Do not cut' };
+}
+
+function getOrdinal(n: number): string {
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return s[(v - 20) % 10] || s[v] || s[0];
+}
+
+export function generateComplicatedWires(seed: number): ComplicatedWiresConfig {
+  const colors: ComplicatedWire['color'][] = ['red', 'blue', 'yellow', 'white', 'black'];
+  const numWires = 6 + Math.floor(Math.random() * 3);
+  const wires: ComplicatedWire[] = [];
+  
+  for (let i = 0; i < numWires; i++) {
+    wires.push({
+      color: randomItem(colors),
+      hasLED: Math.random() > 0.5,
+      hasStar: Math.random() > 0.5,
+      cut: false,
+    });
+  }
+  
+  return { wires, solved: false };
+}
+
+export function getComplicatedWireSolution(wires: ComplicatedWire[], serialNumber: string): number {
+  const serialLastDigit = parseInt(serialNumber.slice(-1));
+  const redWires = wires.map((w, i) => ({ ...w, index: i })).filter(w => w.color === 'red');
+  const blueWires = wires.map((w, i) => ({ ...w, index: i })).filter(w => w.color === 'blue');
+  const yellowWires = wires.map((w, i) => ({ ...w, index: i })).filter(w => w.color === 'yellow');
+  const whiteWires = wires.map((w, i) => ({ ...w, index: i })).filter(w => w.color === 'white');
+  
+  const lastWire = wires[wires.length - 1];
+  const hasLED = wires.some(w => w.hasLED);
+  
+  if (redWires.length === 0) return 1;
+  if (lastWire.color === 'white' && lastWire.hasLED) return wires.length - 1;
+  if (redWires.length > 1 && (serialLastDigit % 2 === 1)) {
+    const lastRed = redWires[redWires.length - 1];
+    return lastRed.index;
+  }
+  if (blueWires.length === 0) return 2;
+  if (yellowWires.length === 0 && hasLED) return wires.length - 1;
+  if (yellowWires.length > 1) return wires.length - 1;
+  
+  return wires.length - 1;
+}
+
+const MORSE_WORDS = [
+  { word: 'shell', freq: 3.505 },
+  { word: 'halls', freq: 3.515 },
+  { word: 'slick', freq: 3.522 },
+  { word: 'trick', freq: 3.532 },
+  { word: 'boxes', freq: 3.535 },
+  { word: 'leaks', freq: 3.542 },
+  { word: 'strobe', freq: 3.545 },
+  { word: 'bistro', freq: 3.552 },
+  { word: 'flick', freq: 3.555 },
+  { word: 'bombs', freq: 3.565 },
+  { word: 'break', freq: 3.572 },
+  { word: 'brick', freq: 3.575 },
+  { word: 'steak', freq: 3.582 },
+  { word: 'sting', freq: 3.592 },
+  { word: 'vector', freq: 3.595 },
+  { word: 'beats', freq: 3.600 },
+];
+
+const MORSE_CODE: Record<string, string> = {
+  'A': '.-',
+  'B': '-...',
+  'C': '-.-.',
+  'D': '-..',
+  'E': '.',
+  'F': '..-.',
+  'G': '--.',
+  'H': '....',
+  'I': '..',
+  'J': '.---',
+  'K': '-.-',
+  'L': '.-..',
+  'M': '--',
+  'N': '-.',
+  'O': '---',
+  'P': '.--.',
+  'Q': '--.-',
+  'R': '.-.',
+  'S': '...',
+  'T': '-',
+  'U': '..-',
+  'V': '...-',
+  'W': '.--',
+  'X': '-..-',
+  'Y': '-.--',
+  'Z': '--..',
+};
+
+export function generateMorseCode(): MorseCodeConfig {
+  const morseEntry = randomItem(MORSE_WORDS);
+  return {
+    word: morseEntry.word,
+    frequency: morseEntry.freq,
+    solved: false,
+  };
+}
+
+export function getMorseCodeSequence(word: string): string[] {
+  return word.toUpperCase().split('').map(letter => MORSE_CODE[letter] || '').filter(Boolean);
+}
+
+const MEMORY_LABELS = ['1', '2', '3', '4'];
+
+export function generateMemory(): MemoryConfig {
+  const labels = [...MEMORY_LABELS].sort(() => Math.random() - 0.5);
+  return {
+    display: Math.floor(Math.random() * 4) + 1,
+    buttons: labels,
+    stage: 0,
+    solved: false,
+    pressedLabels: [],
+    pressedPositions: [],
+  };
+}
+
+export function getMemorySolution(config: MemoryConfig): { position: number; label: string } | null {
+  const display = config.display;
+  const stage = config.stage;
+  const pressedLabel = config.pressedLabels[0];
+  const pressedPosition = config.pressedPositions[0];
+  const pressedLabel2 = config.pressedLabels[1];
+  const pressedPosition2 = config.pressedPositions[1];
+  const pressedLabel4 = config.pressedLabels[3];
+  const pressedLabel3 = config.pressedLabels[2];
+  
+  if (stage === 0) {
+    switch (display) {
+      case 1: return { position: 1, label: '' };
+      case 2: return { position: 1, label: '' };
+      case 3: return { position: 2, label: '' };
+      case 4: return { position: 3, label: '' };
+    }
+  }
+  
+  if (stage === 1) {
+    switch (display) {
+      case 1: return { position: -1, label: '4' };
+      case 2: return { position: pressedPosition, label: '' };
+      case 3: return { position: 0, label: '' };
+      case 4: return { position: pressedPosition, label: '' };
+    }
+  }
+  
+  if (stage === 2) {
+    switch (display) {
+      case 1: return { position: -1, label: pressedLabel2 || '' };
+      case 2: return { position: -1, label: pressedLabel || '' };
+      case 3: return { position: 2, label: '' };
+      case 4: return { position: -1, label: '4' };
+    }
+  }
+  
+  if (stage === 3) {
+    switch (display) {
+      case 1: return { position: pressedPosition, label: '' };
+      case 2: return { position: 0, label: '' };
+      case 3: return { position: pressedPosition2, label: '' };
+      case 4: return { position: pressedPosition2, label: '' };
+    }
+  }
+  
+  if (stage === 4) {
+    switch (display) {
+      case 1: return { position: -1, label: pressedLabel || '' };
+      case 2: return { position: -1, label: pressedLabel2 || '' };
+      case 3: return { position: -1, label: pressedLabel4 || '' };
+      case 4: return { position: -1, label: pressedLabel3 || '' };
+    }
+  }
+  
+  return null;
+}
+
+const WHOSONFIRST_DISPLAYS = [
+  'YES', 'FIRST', 'DISPLAY', 'OKAY', 'SAYS', 'NOTHING', 'BLANK', 'NO', 
+  'LED', 'LEAD', 'READ', 'RED', 'REED', 'LEED', 'HOLD ON', 'YOU', 
+  'YOU ARE', 'YOUR', "YOU'RE", 'UR', 'THERE', "THEY'RE", 'THEIR', 
+  'THEY ARE', 'SEE', 'C', 'CEE'
+];
+
+const WHOSONFIRST_BUTTON_LABELS = [
+  'YES', 'OKAY', 'WHAT', 'MIDDLE', 'LEFT', 'PRESS', 'RIGHT', 'BLANK', 
+  'READY', 'NO', 'FIRST', 'UHHH', 'NOTHING', 'WAIT', 'READY', 'BLANK', 
+  'WHAT', 'PRESS', 'FIRST', 'NOTHING', 'WAIT', 'YES', 'LEFT', 'YOU', 
+  'SURE', 'YOU ARE', 'YOUR', "YOU'RE", 'NEXT', 'UH HUH', 'UR', 'HOLD', 
+  'WHAT?', 'DONE', 'U'
+];
+
+const WHOSONFIRST_STEP1: Record<string, number> = {
+  'YES': 0,
+  'FIRST': 1,
+  'DISPLAY': 2,
+  'OKAY': 3,
+  'SAYS': 4,
+  'NOTHING': 5,
+  'BLANK': 0,
+  'NO': 0,
+  'LED': 0,
+  'LEAD': 1,
+  'READ': 2,
+  'RED': 0,
+  'REED': 1,
+  'LEED': 2,
+  'HOLD ON': 3,
+  'YOU': 0,
+  'YOU ARE': 1,
+  'YOUR': 2,
+  "YOU'RE": 3,
+  'UR': 4,
+  'THERE': 5,
+  "THEY'RE": 0,
+  'THEIR': 1,
+  'THEY ARE': 2,
+  'SEE': 0,
+  'C': 1,
+  'CEE': 2,
+};
+
+const WHOSONFIRST_STEP2: Record<string, string[]> = {
+  'READY': ['YES', 'OKAY', 'WHAT', 'MIDDLE', 'LEFT', 'PRESS', 'RIGHT', 'BLANK', 'READY', 'NO', 'FIRST', 'UHHH', 'NOTHING', 'WAIT'],
+  'FIRST': ['LEFT', 'OKAY', 'YES', 'MIDDLE', 'NO', 'RIGHT', 'NOTHING', 'UHHH', 'WAIT', 'READY', 'BLANK', 'WHAT', 'PRESS', 'FIRST'],
+  'NO': ['BLANK', 'UHHH', 'WAIT', 'FIRST', 'WHAT', 'READY', 'RIGHT', 'YES', 'NOTHING', 'LEFT', 'PRESS', 'OKAY', 'NO', 'MIDDLE'],
+  'BLANK': ['WAIT', 'RIGHT', 'OKAY', 'MIDDLE', 'BLANK', 'PRESS', 'READY', 'NOTHING', 'NO', 'WHAT', 'LEFT', 'UHHH', 'YES', 'FIRST'],
+  'NOTHING': ['UHHH', 'RIGHT', 'OKAY', 'MIDDLE', 'YES', 'BLANK', 'NO', 'PRESS', 'LEFT', 'WHAT', 'WAIT', 'FIRST', 'NOTHING', 'READY'],
+  'YES': ['OKAY', 'RIGHT', 'UHHH', 'MIDDLE', 'FIRST', 'WHAT', 'PRESS', 'READY', 'NOTHING', 'YES', 'LEFT', 'BLANK', 'NO', 'WAIT'],
+  'WHAT': ['UHHH', 'WHAT', 'LEFT', 'NOTHING', 'READY', 'BLANK', 'MIDDLE', 'NO', 'OKAY', 'FIRST', 'WAIT', 'YES', 'PRESS', 'RIGHT'],
+  'UHHH': ['READY', 'NOTHING', 'LEFT', 'WHAT', 'OKAY', 'YES', 'RIGHT', 'NO', 'PRESS', 'BLANK', 'UHHH', 'MIDDLE', 'WAIT', 'FIRST'],
+  'LEFT': ['RIGHT', 'LEFT', 'FIRST', 'NO', 'MIDDLE', 'YES', 'BLANK', 'WHAT', 'UHHH', 'WAIT', 'PRESS', 'READY', 'OKAY', 'NOTHING'],
+  'RIGHT': ['YES', 'NOTHING', 'READY', 'PRESS', 'NO', 'WAIT', 'WHAT', 'RIGHT', 'MIDDLE', 'LEFT', 'UHHH', 'BLANK', 'OKAY', 'FIRST'],
+  'MIDDLE': ['BLANK', 'READY', 'OKAY', 'WHAT', 'NOTHING', 'PRESS', 'NO', 'WAIT', 'LEFT', 'MIDDLE', 'RIGHT', 'FIRST', 'UHHH', 'YES'],
+  'OKAY': ['MIDDLE', 'NO', 'FIRST', 'YES', 'UHHH', 'NOTHING', 'WAIT', 'OKAY', 'LEFT', 'READY', 'BLANK', 'PRESS', 'WHAT', 'RIGHT'],
+  'WAIT': ['UHHH', 'NO', 'BLANK', 'OKAY', 'YES', 'LEFT', 'FIRST', 'PRESS', 'WHAT', 'WAIT', 'NOTHING', 'READY', 'RIGHT', 'MIDDLE'],
+  'PRESS': ['RIGHT', 'MIDDLE', 'YES', 'READY', 'PRESS', 'OKAY', 'NOTHING', 'UHHH', 'BLANK', 'LEFT', 'FIRST', 'WHAT', 'NO', 'WAIT'],
+  'YOU': ['SURE', 'YOU ARE', 'YOUR', "YOU'RE", 'NEXT', 'UH HUH', 'UR', 'HOLD', 'WHAT?', 'YOU', 'UH UH', 'LIKE', 'DONE', 'U'],
+  'YOU ARE': ['YOUR', 'NEXT', 'LIKE', 'UH HUH', 'WHAT?', 'DONE', 'UH UH', 'HOLD', 'YOU', 'U', "YOU'RE", 'SURE', 'UR', 'YOU ARE'],
+  'YOUR': ['UH UH', 'YOU ARE', 'UH HUH', 'YOUR', 'NEXT', 'UR', 'SURE', 'U', "YOU'RE", 'YOU', 'WHAT?', 'HOLD', 'LIKE', 'DONE'],
+  "YOU'RE": ['YOU', "YOU'RE", 'UR', 'NEXT', 'UH UH', 'YOU ARE', 'U', 'YOUR', 'WHAT?', 'UH HUH', 'SURE', 'DONE', 'LIKE', 'HOLD'],
+  'UR': ['DONE', 'U', 'UR', 'UH HUH', 'WHAT?', 'SURE', 'YOUR', 'HOLD', "YOU'RE", 'LIKE', 'NEXT', 'UH UH', 'YOU ARE', 'YOU'],
+  'U': ['UH HUH', 'SURE', 'NEXT', 'WHAT?', "YOU'RE", 'UR', 'UH UH', 'DONE', 'U', 'YOU', 'LIKE', 'HOLD', 'YOU ARE', 'YOUR'],
+  'UH HUH': ['UH HUH', 'YOUR', 'YOU ARE', 'YOU', 'DONE', 'HOLD', 'UH UH', 'NEXT', 'SURE', 'LIKE', "YOU'RE", 'UR', 'U', 'WHAT?'],
+  'UH UH': ['UR', 'U', 'YOU ARE', "YOU'RE", 'NEXT', 'UH UH', 'DONE', 'YOU', 'UH HUH', 'LIKE', 'YOUR', 'SURE', 'HOLD', 'WHAT?'],
+  'WHAT?': ['YOU', 'HOLD', "YOU'RE", 'YOUR', 'U', 'DONE', 'UH UH', 'LIKE', 'YOU ARE', 'UH HUH', 'UR', 'NEXT', 'WHAT?', 'SURE'],
+  'DONE': ['SURE', 'UH HUH', 'NEXT', 'WHAT?', 'YOUR', 'UR', "YOU'RE", 'HOLD', 'LIKE', 'YOU', 'U', 'YOU ARE', 'UH UH', 'DONE'],
+  'NEXT': ['WHAT?', 'UH HUH', 'UH UH', 'YOUR', 'HOLD', 'SURE', 'NEXT', 'LIKE', 'DONE', 'YOU ARE', 'UR', "YOU'RE", 'U', 'YOU'],
+  'HOLD': ['YOU ARE', 'U', 'DONE', 'UH UH', 'YOU', 'UR', 'SURE', 'WHAT?', "YOU'RE", 'NEXT', 'HOLD', 'UH HUH', 'YOUR', 'LIKE'],
+  'SURE': ['YOU ARE', 'DONE', 'LIKE', "YOU'RE", 'YOU', 'HOLD', 'UH HUH', 'UR', 'SURE', 'U', 'WHAT?', 'NEXT', 'YOUR', 'UH UH'],
+  'LIKE': ["YOU'RE", 'NEXT', 'U', 'UR', 'HOLD', 'DONE', 'UH UH', 'WHAT?', 'UH HUH', 'YOU', 'LIKE', 'SURE', 'YOU ARE', 'YOUR'],
+};
+
+export function generateWhosOnFirst(): WhosOnFirstConfig {
+  const display = randomItem(WHOSONFIRST_DISPLAYS);
+  const buttonLabels = [...WHOSONFIRST_BUTTON_LABELS];
+  const shuffled = buttonLabels.sort(() => Math.random() - 0.5).slice(0, 6);
+  
+  return {
+    display,
+    buttons: shuffled,
+    solved: false,
+    stage: 0,
+  };
+}
+
+export function getWhosOnFirstSolution(config: WhosOnFirstConfig): string {
+  const position = WHOSONFIRST_STEP1[config.display];
+  if (position === undefined) return config.buttons[0];
+  
+  const labelToRead = config.buttons[position];
+  if (!labelToRead) return config.buttons[0];
+  
+  const buttonOrder = WHOSONFIRST_STEP2[labelToRead];
+  if (!buttonOrder) return config.buttons[0];
+  
+  for (const label of buttonOrder) {
+    const idx = config.buttons.indexOf(label);
+    if (idx !== -1) return label;
+  }
+  
+  return config.buttons[0];
+}
+
+const KEYPAD_COLUMNS: KeypadSymbol[][] = [
+  ['balloon', 'euro', 'copyright', 'six', 'pitchfork'],
+  ['six', 'at', 'balloon', 'pumpkin', 'paragraph'],
+  ['smileyface', 'euro', 'upsidedowny', 'leftc', 'cursive'],
+  ['bt', 'bt', 'tracks', 'squigglyn', 'cursive'],
+  ['doublek', 'squidknife', 'rightc', 'ae', 'squidknife'],
+  ['hollowstar', 'meltedthree', 'doublek', 'paragraph', 'pitchfork'],
+  ['hookn', 'hookn', 'upsidedowny', 'questionmark', 'dragon'],
+  ['nwithhat', 'leftc', 'questionmark', 'hollowstar', 'smileyface'],
+  ['filledstar', 'omega', 'squigglyn', 'whirl', 'wrench'],
+];
+
+function shuffle<T>(arr: T[]): T[] {
+  const result = [...arr];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
+
+export function generateKeypad(): KeypadConfig {
+  const allSymbols: KeypadSymbol[] = [
+    'balloon', 'copyright', 'doublek', 'euro', 'filledstar',
+    'hollowstar', 'hookn', 'meltedthree', 'omega', 'paragraph',
+    'pitchfork', 'six', 'smileyface', 'squidknife', 'squigglyn',
+    'tracks', 'trident', 'upsidedowny', 'at', 'ae', 'cursive',
+    'rightc', 'leftc', 'questionmark', 'pumpkin',
+  ];
+  
+  const shuffled = shuffle(allSymbols).slice(0, 4);
+  const column = randomItem(KEYPAD_COLUMNS);
+  
+  return {
+    symbols: shuffled,
+    column,
+    solved: false,
+    pressed: -1,
+  };
+}
+
+export function checkKeypadOrder(config: KeypadConfig, symbol: KeypadSymbol): boolean {
+  if (config.solved) return false;
+  
+  const currentIndex = config.pressed + 1;
+  const expectedSymbol = config.column[currentIndex];
+  
+  if (symbol === expectedSymbol) {
+    return true;
+  }
+  return false;
+}
+
 export type Bomb = {
   serialNumber: string;
   batteries: number;
   indicators: string[];
+  ports: string[];
   timerSeconds: number;
   initialTimerSeconds: number;
   strikes: number;
@@ -48,6 +546,12 @@ export type Bomb = {
   won: boolean;
   wires: WireConfig;
   button: ButtonConfig;
+  keypad?: KeypadConfig;
+  whosOnFirst?: WhosOnFirstConfig;
+  memory?: MemoryConfig;
+  morseCode?: MorseCodeConfig;
+  complicatedWires?: ComplicatedWiresConfig;
+  wireSequences?: WireSequencesConfig;
   simon?: SimonConfig;
   passwords?: PasswordConfig;
 };
@@ -57,6 +561,20 @@ const SERIAL_DIGITS: string[] = '0123456789'.split('');
 const VOWELS = new Set(['A', 'E', 'I', 'O', 'U']);
 
 const SIMON_COLORS: SimonColor[] = ['blue', 'yellow', 'red', 'green'];
+
+const ALL_PORTS = ['DVI-D', 'Parallel', 'PS/2', 'RJ-45', 'Serial', 'Stereo RCA'];
+
+function randomPorts(): string[] {
+  const count = Math.floor(Math.random() * 3);
+  const ports: string[] = [];
+  const available = [...ALL_PORTS];
+  for (let i = 0; i < count; i++) {
+    if (available.length === 0) break;
+    const idx = Math.floor(Math.random() * available.length);
+    ports.push(available.splice(idx, 1)[0]);
+  }
+  return ports;
+}
 
 const PASSWORD_WORDS = new Set([
   'about', 'after', 'again', 'below', 'could', 'every', 'first', 'found', 'great', 'house',
@@ -102,16 +620,20 @@ function randomWires(): WireColor[] {
   return wires;
 }
 
-export function createBomb(timerMinutes: number, difficulty: 'easy' | 'medium' | 'hard'): Bomb {
+export type Difficulty = 'easy' | 'medium' | 'hard' | 'devtest';
+
+export function createBomb(timerMinutes: number, difficulty: Difficulty): Bomb {
   const serialNumber = randomSerialNumber();
   const batteries = randomBatteries();
   const indicators = randomIndicators();
+  const ports = randomPorts();
   const timerSeconds = timerMinutes * 60;
   
   const bomb: Bomb = {
     serialNumber,
     batteries,
     indicators,
+    ports,
     timerSeconds,
     initialTimerSeconds: timerSeconds,
     strikes: 0,
@@ -131,24 +653,30 @@ export function createBomb(timerMinutes: number, difficulty: 'easy' | 'medium' |
       released: false,
     },
   };
-  
-  // Add modules based on difficulty
-  if (difficulty === 'medium' || difficulty === 'hard') {
-    bomb.simon = {
-      sequence: [generateRandomSimonFlash()],
-      stage: 0,
-      solved: false,
-      lastFlash: null,
-    };
-    
-    bomb.passwords = {
-      columns: generatePasswordColumns(),
-      solved: false,
-    };
+
+  if (difficulty === 'devtest') {
+    bomb.keypad = generateKeypad();
+    bomb.whosOnFirst = generateWhosOnFirst();
+    bomb.memory = generateMemory();
+    bomb.morseCode = generateMorseCode();
+    bomb.complicatedWires = generateComplicatedWires(0);
+    bomb.wireSequences = generateWireSequences();
+  } else if (difficulty === 'easy') {
+    bomb.keypad = generateKeypad();
+    bomb.whosOnFirst = generateWhosOnFirst();
+  } else if (difficulty === 'medium') {
+    bomb.keypad = generateKeypad();
+    bomb.whosOnFirst = generateWhosOnFirst();
+    bomb.memory = generateMemory();
+    bomb.morseCode = generateMorseCode();
+  } else {
+    bomb.keypad = generateKeypad();
+    bomb.whosOnFirst = generateWhosOnFirst();
+    bomb.memory = generateMemory();
+    bomb.morseCode = generateMorseCode();
+    bomb.complicatedWires = generateComplicatedWires(0);
+    bomb.wireSequences = generateWireSequences();
   }
-  
-  // For hard difficulty, we could add more modules here later
-  // For now, medium and hard are the same (4 modules)
   
   return bomb;
 }
@@ -238,6 +766,14 @@ export function hasVowel(bomb: Bomb): boolean {
   const firstLetter = bomb.serialNumber[0] as string;
   const secondLetter = bomb.serialNumber[1] as string;
   return VOWELS.has(firstLetter) || VOWELS.has(secondLetter);
+}
+
+export function hasPort(bomb: Bomb, port: string): boolean {
+  return bomb.ports.includes(port);
+}
+
+export function isSerialEven(bomb: Bomb): boolean {
+  return getSerialLastDigit(bomb) % 2 === 0;
 }
 
 export function getSimonPressColor(flashColor: SimonColor, bomb: Bomb): SimonColor {
