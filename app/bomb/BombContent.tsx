@@ -892,7 +892,7 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
 
       <div className="max-w-4xl mx-auto pt-4">
         <div className="flex items-center justify-between mb-6">
-          <Link href="/" className="text-zinc-500 hover:text-zinc-400">
+          <Link href="/" onClick={() => stopBeepLoop()} className="text-zinc-500 hover:text-zinc-400">
             ← Exit
           </Link>
         </div>
@@ -1525,6 +1525,8 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
                 onMouseDown={pressButton}
                 onMouseUp={releaseButton}
                 onMouseLeave={() => bomb.button.held && releaseButton()}
+                onTouchStart={pressButton}
+                onTouchEnd={releaseButton}
                 disabled={bomb.button.solved || bomb.gameOver}
                 className={`w-32 h-32 rounded-full font-bold text-xl transition-all ${
                   bomb.button.color === "red"
