@@ -1061,9 +1061,7 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
                 className={`absolute top-3 right-3 w-4 h-4 rounded-full ${bomb.whosOnFirst.solved ? "bg-green-500" : "bg-zinc-600"}`}
               />
               {difficulty === "devtest" && (
-                <h2 className="text-lg font-semibold text-zinc-200 mb-4">
-                  Who's on First
-                </h2>
+                <div className="mb-4" />
               )}
               <div className="bg-zinc-900 rounded-lg p-4 mb-4 text-center">
                 <span className="text-2xl font-bold text-yellow-400">
@@ -1098,9 +1096,7 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
                 className={`absolute top-3 right-3 w-4 h-4 rounded-full ${bomb.memory.solved ? "bg-green-500" : "bg-zinc-600"}`}
               />
               {difficulty === "devtest" && (
-                <h2 className="text-lg font-semibold text-zinc-200 mb-4">
-                  Memory
-                </h2>
+                <div className="mb-4" />
               )}
               <div className="bg-zinc-900 rounded-lg p-4 mb-4 text-center">
                 <span className="text-4xl font-bold text-yellow-400">
@@ -1135,9 +1131,7 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
               className={`bg-gradient-to-br from-zinc-800 to-zinc-900 rounded-2xl p-6 relative border-2 border-zinc-700/50 shadow-2xl ${bomb.morseCode.solved ? "opacity-60" : ""}`}
             >
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-bold text-zinc-200 tracking-wider uppercase">
-                  Morse Code
-                </h2>
+                <div />
               </div>
               <div className="bg-zinc-900 rounded-lg p-4 mb-4 text-center border border-zinc-700/50">
                 <span className="text-2xl font-bold text-yellow-400">
@@ -1187,9 +1181,7 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
               className={`bg-gradient-to-br from-zinc-800 to-zinc-900 rounded-2xl p-6 relative border-2 border-zinc-700/50 shadow-2xl ${bomb.complicatedWires.solved ? "opacity-60" : ""}`}
             >
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-bold text-zinc-200 tracking-wider uppercase">
-                  Complicated Wires
-                </h2>
+                <div />
               </div>
               <div className="space-y-2">
                 {bomb.complicatedWires.wires.map((wire, idx) => {
@@ -1258,9 +1250,7 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
                 className={`absolute top-3 right-3 w-4 h-4 rounded-full ${bomb.wireSequences.solved ? "bg-green-500" : "bg-zinc-600"}`}
               />
               {difficulty === "devtest" && (
-                <h2 className="text-lg font-semibold text-zinc-200 mb-4">
-                  Wire Sequences
-                </h2>
+                <div className="mb-4" />
               )}
               <div className="flex items-center justify-center gap-4 mb-4">
                 <button
@@ -1354,9 +1344,7 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
                 className={`absolute top-3 right-3 w-4 h-4 rounded-full ${bomb.simon.solved ? "bg-green-500" : "bg-zinc-600"}`}
               />
               {difficulty === "devtest" && (
-                <h2 className="text-lg font-semibold text-zinc-200 mb-4">
-                  Simon
-                </h2>
+                <div className="mb-4" />
               )}
               <div className="flex flex-col items-center">
                 <div className="text-zinc-400 text-sm mb-4">
@@ -1430,9 +1418,7 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
                 className={`absolute top-3 right-3 w-4 h-4 rounded-full ${bomb.passwords.solved ? "bg-green-500" : "bg-zinc-600"}`}
               />
               {difficulty === "devtest" && (
-                <h2 className="text-lg font-semibold text-zinc-200 mb-4">
-                  Passwords
-                </h2>
+                <div className="mb-4" />
               )}
               <div className="flex flex-col items-center gap-2">
                 <div className="grid grid-cols-5 gap-2">
@@ -1478,12 +1464,10 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
             <div className="absolute top-3 right-3 w-4 h-4 rounded-full bg-zinc-600" />
             <div
               className={`absolute top-3 right-3 w-4 h-4 rounded-full ${bomb.wires.solved ? "bg-green-500" : "bg-zinc-600"}`}
-            />
-            {difficulty === "devtest" && (
-              <h2 className="text-lg font-semibold text-zinc-200 mb-4">
-                Wires
-              </h2>
-            )}
+/>
+              {difficulty === "devtest" && (
+                <div className="mb-4" />
+              )}
             <div className="space-y-3">
               {bomb.wires.wires.map((color, idx) => (
                 <button
@@ -1514,12 +1498,10 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
             <div className="absolute top-3 right-3 w-4 h-4 rounded-full bg-zinc-600" />
             <div
               className={`absolute top-3 right-3 w-4 h-4 rounded-full ${bomb.button.solved ? "bg-green-500" : "bg-zinc-600"}`}
-            />
-            {difficulty === "devtest" && (
-              <h2 className="text-lg font-semibold text-zinc-200 mb-4">
-                The Button
-              </h2>
-            )}
+/>
+              {difficulty === "devtest" && (
+                <div className="mb-4" />
+              )}
             <div className="flex flex-col items-center">
               <button
                 onMouseDown={pressButton}
