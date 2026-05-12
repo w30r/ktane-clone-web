@@ -897,29 +897,29 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
           </Link>
         </div>
 
-        <div className="bg-zinc-800 rounded-xl p-4 mb-6 sticky top-0 z-30 backdrop-blur-md bg-zinc-800/95">
-          <div className="flex items-start justify-between gap-8">
+        <div className="bg-zinc-800 rounded-xl p-2 sm:p-4 mb-3 sm:mb-6 sticky top-0 z-30 backdrop-blur-md bg-zinc-800/95">
+          <div className="flex items-start justify-between gap-2 sm:gap-8">
             {/* Left sidebar - Edgework */}
-            <div className="flex gap-8">
+            <div className="flex gap-1 sm:gap-8 overflow-x-auto">
               {/* Serial Number */}
-              <div className="bg-zinc-900 px-3 py-2 rounded border border-zinc-700">
-                <div className="text-xs text-zinc-500 mb-1">Serial #</div>
-                <div className="text-lg font-mono text-zinc-200 tracking-wider">
+              <div className="bg-zinc-900 px-1 sm:px-3 py-1 sm:py-2 rounded border border-zinc-700">
+                <div className="text-[10px] sm:text-xs text-zinc-500 mb-0.5 sm:mb-1">Serial #</div>
+                <div className="text-sm sm:text-lg font-mono text-zinc-200 tracking-wider">
                   {bomb.serialNumber}
                 </div>
               </div>
 
               {/* Ports */}
               {bomb.ports.length > 0 && (
-                <div className="bg-zinc-900 px-3 py-2 rounded border border-zinc-700">
-                  <div className="text-xs text-zinc-500 mb-1">Ports</div>
-                  <div className="flex gap-2">
+                <div className="bg-zinc-900 px-1 sm:px-3 py-1 sm:py-2 rounded border border-zinc-700">
+                  <div className="text-[10px] sm:text-xs text-zinc-500 mb-0.5 sm:mb-1">Ports</div>
+                  <div className="flex gap-1 sm:gap-2">
                     {bomb.ports.map((port, idx) => (
                       <img
                         key={idx}
                         src={PORT_IMAGES[port]}
                         alt={port}
-                        className="h-8 w-auto opacity-90"
+                        className="h-4 sm:h-8 w-auto opacity-90"
                         title={port}
                       />
                     ))}
@@ -929,13 +929,13 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
 
               {/* Indicators */}
               {bomb.indicators.length > 0 && (
-                <div className="bg-zinc-900 px-3 py-2 rounded border border-zinc-700">
-                  <div className="text-xs text-zinc-500 mb-1">Indicators</div>
-                  <div className="flex gap-2">
+                <div className="bg-zinc-900 px-1 sm:px-3 py-1 sm:py-2 rounded border border-zinc-700">
+                  <div className="text-[10px] sm:text-xs text-zinc-500 mb-0.5 sm:mb-1">Indicators</div>
+                  <div className="flex gap-1 sm:gap-2">
                     {bomb.indicators.map((ind, idx) => (
                       <div
                         key={idx}
-                        className="text-lg font-mono text-yellow-400"
+                        className="text-sm sm:text-lg font-mono text-yellow-400"
                       >
                         {ind}
                       </div>
@@ -945,29 +945,29 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
               )}
 
               {/* Batteries */}
-              <div className="bg-zinc-900 px-3 py-2 rounded border border-zinc-700">
-                <div className="text-xs text-zinc-500 mb-1">Batteries</div>
-                <div className="flex gap-1">
+              <div className="bg-zinc-900 px-1 sm:px-3 py-1 sm:py-2 rounded border border-zinc-700">
+                <div className="text-[10px] sm:text-xs text-zinc-500 mb-0.5 sm:mb-1">Batteries</div>
+                <div className="flex gap-0.5 sm:gap-1">
                   {Array.from({ length: bomb.batteries }).map((_, i) => (
-                    <span key={i} className="text-lg">
+                    <span key={i} className="text-sm sm:text-lg">
                       🔋
                     </span>
                   ))}
                   {bomb.batteries === 0 && (
-                    <span className="text-zinc-600 text-lg">-</span>
+                    <span className="text-zinc-600 text-sm sm:text-lg">-</span>
                   )}
                 </div>
               </div>
             </div>
 
             {/* Timer */}
-            <div className="flex flex-col items-center">
+            <div className="flex flex-col items-center shrink-0">
               <div
-                className={`text-5xl font-mono font-bold ${bomb.strikes > 0 ? "text-red-500 animate-pulse" : "text-green-500"}`}
+                className={`text-2xl sm:text-5xl font-mono font-bold ${bomb.strikes > 0 ? "text-red-500 animate-pulse" : "text-green-500"}`}
               >
                 {formatTime(bomb.timerSeconds)}
               </div>
-              <div className="text-zinc-500 text-sm mt-1">
+              <div className="text-zinc-500 text-[10px] sm:text-sm">
                 Strikes: <span className="text-red-400 font-bold">{bomb.strikes}/3</span>
               </div>
             </div>
