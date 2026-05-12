@@ -647,7 +647,12 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
             ...b.wireSequences!,
             panels: b.wireSequences!.panels.map((p, i) =>
               i === panelIndex
-                ? { ...p, wires: p.wires.map((w, j) => (j === wireIndex ? { ...w, cut: true } : w)) }
+                ? {
+                    ...p,
+                    wires: p.wires.map((w, j) =>
+                      j === wireIndex ? { ...w, cut: true } : w,
+                    ),
+                  }
                 : p,
             ),
             cutWires: [...b.wireSequences!.cutWires, wire.color],
@@ -682,7 +687,11 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
         // Check if any uncut wire SHOULD be cut
         const uncutShouldCut = panel.wires.some((w) => {
           if (w.cut) return false;
-          const solution = getWireSequenceSolution(w.toLetter, w.color, w.occurrence);
+          const solution = getWireSequenceSolution(
+            w.toLetter,
+            w.color,
+            w.occurrence,
+          );
           return solution.cut;
         });
 
@@ -890,9 +899,13 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
         </div>
       )}
 
-      <div className="max-w-4xl mx-auto pt-4">
+      <div className="max-w-4xl mx-auto pt-4 pb-20 px-2 sm:px-0">
         <div className="flex items-center justify-between mb-6">
-          <Link href="/" onClick={() => stopBeepLoop()} className="text-zinc-500 hover:text-zinc-400">
+          <Link
+            href="/"
+            onClick={() => stopBeepLoop()}
+            className="text-zinc-500 hover:text-zinc-400"
+          >
             ← Exit
           </Link>
         </div>
@@ -903,7 +916,9 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
             <div className="flex gap-1 sm:gap-8 overflow-x-auto">
               {/* Serial Number */}
               <div className="bg-zinc-900 px-1 sm:px-3 py-1 sm:py-2 rounded border border-zinc-700">
-                <div className="text-[10px] sm:text-xs text-zinc-500 mb-0.5 sm:mb-1">Serial #</div>
+                <div className="text-[10px] sm:text-xs text-zinc-500 mb-0.5 sm:mb-1">
+                  Serial #
+                </div>
                 <div className="text-sm sm:text-lg font-mono text-zinc-200 tracking-wider">
                   {bomb.serialNumber}
                 </div>
@@ -912,7 +927,9 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
               {/* Ports */}
               {bomb.ports.length > 0 && (
                 <div className="bg-zinc-900 px-1 sm:px-3 py-1 sm:py-2 rounded border border-zinc-700">
-                  <div className="text-[10px] sm:text-xs text-zinc-500 mb-0.5 sm:mb-1">Ports</div>
+                  <div className="text-[10px] sm:text-xs text-zinc-500 mb-0.5 sm:mb-1">
+                    Ports
+                  </div>
                   <div className="flex gap-1 sm:gap-2">
                     {bomb.ports.map((port, idx) => (
                       <img
@@ -930,7 +947,9 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
               {/* Indicators */}
               {bomb.indicators.length > 0 && (
                 <div className="bg-zinc-900 px-1 sm:px-3 py-1 sm:py-2 rounded border border-zinc-700">
-                  <div className="text-[10px] sm:text-xs text-zinc-500 mb-0.5 sm:mb-1">Indicators</div>
+                  <div className="text-[10px] sm:text-xs text-zinc-500 mb-0.5 sm:mb-1">
+                    Indicators
+                  </div>
                   <div className="flex gap-1 sm:gap-2">
                     {bomb.indicators.map((ind, idx) => (
                       <div
@@ -946,7 +965,9 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
 
               {/* Batteries */}
               <div className="bg-zinc-900 px-1 sm:px-3 py-1 sm:py-2 rounded border border-zinc-700">
-                <div className="text-[10px] sm:text-xs text-zinc-500 mb-0.5 sm:mb-1">Batteries</div>
+                <div className="text-[10px] sm:text-xs text-zinc-500 mb-0.5 sm:mb-1">
+                  Batteries
+                </div>
                 <div className="flex gap-0.5 sm:gap-1">
                   {Array.from({ length: bomb.batteries }).map((_, i) => (
                     <span key={i} className="text-sm sm:text-lg">
@@ -968,7 +989,8 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
                 {formatTime(bomb.timerSeconds)}
               </div>
               <div className="text-zinc-500 text-[10px] sm:text-sm">
-                Strikes: <span className="text-red-400 font-bold">{bomb.strikes}/3</span>
+                Strikes:{" "}
+                <span className="text-red-400 font-bold">{bomb.strikes}/3</span>
               </div>
             </div>
           </div>
@@ -1060,9 +1082,7 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
               <div
                 className={`absolute top-3 right-3 w-4 h-4 rounded-full ${bomb.whosOnFirst.solved ? "bg-green-500" : "bg-zinc-600"}`}
               />
-              {difficulty === "devtest" && (
-                <div className="mb-4" />
-              )}
+              {difficulty === "devtest" && <div className="mb-4" />}
               <div className="bg-zinc-900 rounded-lg p-4 mb-4 text-center">
                 <span className="text-2xl font-bold text-yellow-400">
                   {bomb.whosOnFirst.display}
@@ -1095,9 +1115,7 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
               <div
                 className={`absolute top-3 right-3 w-4 h-4 rounded-full ${bomb.memory.solved ? "bg-green-500" : "bg-zinc-600"}`}
               />
-              {difficulty === "devtest" && (
-                <div className="mb-4" />
-              )}
+              {difficulty === "devtest" && <div className="mb-4" />}
               <div className="bg-zinc-900 rounded-lg p-4 mb-4 text-center">
                 <span className="text-4xl font-bold text-yellow-400">
                   {bomb.memory.display}
@@ -1249,9 +1267,7 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
               <div
                 className={`absolute top-3 right-3 w-4 h-4 rounded-full ${bomb.wireSequences.solved ? "bg-green-500" : "bg-zinc-600"}`}
               />
-              {difficulty === "devtest" && (
-                <div className="mb-4" />
-              )}
+              {difficulty === "devtest" && <div className="mb-4" />}
               <div className="flex items-center justify-center gap-4 mb-4">
                 <button
                   onClick={() => switchWireSequencePanel("up")}
@@ -1306,8 +1322,17 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
                             {wire.fromPosition + 1}
                           </div>
                           <button
-                            onClick={() => cutWireSequence(bomb.wireSequences!.currentPanel, wireIdx)}
-                            disabled={bomb.wireSequences!.solved || bomb.gameOver || wire.cut}
+                            onClick={() =>
+                              cutWireSequence(
+                                bomb.wireSequences!.currentPanel,
+                                wireIdx,
+                              )
+                            }
+                            disabled={
+                              bomb.wireSequences!.solved ||
+                              bomb.gameOver ||
+                              wire.cut
+                            }
                             className={`flex-1 h-10 rounded-lg relative transition-all ${colorClasses} ${wire.cut ? "opacity-30" : "opacity-80 hover:opacity-100"}`}
                           >
                             {wire.cut && (
@@ -1343,9 +1368,7 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
               <div
                 className={`absolute top-3 right-3 w-4 h-4 rounded-full ${bomb.simon.solved ? "bg-green-500" : "bg-zinc-600"}`}
               />
-              {difficulty === "devtest" && (
-                <div className="mb-4" />
-              )}
+              {difficulty === "devtest" && <div className="mb-4" />}
               <div className="flex flex-col items-center">
                 <div className="text-zinc-400 text-sm mb-4">
                   {simonPhase === "playing"
@@ -1417,9 +1440,7 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
               <div
                 className={`absolute top-3 right-3 w-4 h-4 rounded-full ${bomb.passwords.solved ? "bg-green-500" : "bg-zinc-600"}`}
               />
-              {difficulty === "devtest" && (
-                <div className="mb-4" />
-              )}
+              {difficulty === "devtest" && <div className="mb-4" />}
               <div className="flex flex-col items-center gap-2">
                 <div className="grid grid-cols-5 gap-2">
                   {bomb.passwords.columns.map((col, idx) => (
@@ -1464,10 +1485,8 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
             <div className="absolute top-3 right-3 w-4 h-4 rounded-full bg-zinc-600" />
             <div
               className={`absolute top-3 right-3 w-4 h-4 rounded-full ${bomb.wires.solved ? "bg-green-500" : "bg-zinc-600"}`}
-/>
-              {difficulty === "devtest" && (
-                <div className="mb-4" />
-              )}
+            />
+            {difficulty === "devtest" && <div className="mb-4" />}
             <div className="space-y-3">
               {bomb.wires.wires.map((color, idx) => (
                 <button
@@ -1498,10 +1517,8 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
             <div className="absolute top-3 right-3 w-4 h-4 rounded-full bg-zinc-600" />
             <div
               className={`absolute top-3 right-3 w-4 h-4 rounded-full ${bomb.button.solved ? "bg-green-500" : "bg-zinc-600"}`}
-/>
-              {difficulty === "devtest" && (
-                <div className="mb-4" />
-              )}
+            />
+            {difficulty === "devtest" && <div className="mb-4" />}
             <div className="flex flex-col items-center">
               <button
                 onMouseDown={pressButton}

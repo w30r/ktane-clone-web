@@ -26,7 +26,7 @@ export default function Home() {
   ];
 
   return (
-    <div className="min-h-screen pt-48 bg-zinc-900 flex flex-col items-center justify-center p-4 sm:p-8 font-mono overflow-y-auto">
+    <div className="min-h-screen pt-24 pb-20 bg-zinc-900 flex flex-col items-center p-4 sm:p-8 font-mono overflow-y-auto">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
           <h1 className="text-4xl font-bold text-red-500 tracking-wider mb-2 ">
