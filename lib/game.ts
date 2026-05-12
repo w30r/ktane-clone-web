@@ -40,8 +40,8 @@ export type KeypadSymbol =
   | 'balloon' | 'copyright' | 'doublek' | 'euro' | 'filledstar' 
   | 'hollowstar' | 'hookn' | 'meltedthree' | 'omega' | 'paragraph'
   | 'pitchfork' | 'press' | 'six' | 'smileyface' | 'squidknife'
-  | 'squigglyn' | 'tracks' | 'trident' | 'upsidedowny' | 'whirl'
-  | 'wrench' | 'at' | 'ae' | 'cursive' | 'rightc' | 'leftc'
+  | 'squigglyn' | 'tracks' | 'upsidedowny'
+  | 'at' | 'ae' | 'cursive' | 'rightc' | 'leftc'
   | 'questionmark' | 'dragon' | 'nwithhat' | 'bt' | 'pumpkin';
 
 export type KeypadConfig = {
@@ -49,6 +49,7 @@ export type KeypadConfig = {
   column: KeypadSymbol[];
   solved: boolean;
   pressed: number;
+  pressedSymbols: KeypadSymbol[];
 };
 
 export type WhosOnFirstConfig = {
@@ -374,79 +375,57 @@ export function getMemorySolution(config: MemoryConfig): { position: number; lab
 }
 
 const WHOSONFIRST_DISPLAYS = [
-  'YES', 'FIRST', 'DISPLAY', 'OKAY', 'SAYS', 'NOTHING', 'BLANK', 'NO', 
-  'LED', 'LEAD', 'READ', 'RED', 'REED', 'LEED', 'HOLD ON', 'YOU', 
-  'YOU ARE', 'YOUR', "YOU'RE", 'UR', 'THERE', "THEY'RE", 'THEIR', 
+  'YES', 'FIRST', 'DISPLAY', 'OKAY', 'SAYS', 'NOTHING', 'BLANK', 'NO',
+  'LED', 'LEAD', 'READ', 'RED', 'REED', 'LEED', 'HOLD ON', 'YOU',
+  'YOU ARE', 'YOUR', "YOU'RE", 'UR', 'THERE', "THEY'RE", 'THEIR',
   'THEY ARE', 'SEE', 'C', 'CEE'
 ];
 
 const WHOSONFIRST_BUTTON_LABELS = [
-  'YES', 'OKAY', 'WHAT', 'MIDDLE', 'LEFT', 'PRESS', 'RIGHT', 'BLANK', 
-  'READY', 'NO', 'FIRST', 'UHHH', 'NOTHING', 'WAIT', 'READY', 'BLANK', 
-  'WHAT', 'PRESS', 'FIRST', 'NOTHING', 'WAIT', 'YES', 'LEFT', 'YOU', 
-  'SURE', 'YOU ARE', 'YOUR', "YOU'RE", 'NEXT', 'UH HUH', 'UR', 'HOLD', 
+  'YES', 'OKAY', 'WHAT', 'MIDDLE', 'LEFT', 'PRESS', 'RIGHT', 'BLANK',
+  'READY', 'NO', 'FIRST', 'UHHH', 'NOTHING', 'WAIT', 'READY', 'BLANK',
+  'WHAT', 'PRESS', 'FIRST', 'NOTHING', 'WAIT', 'YES', 'LEFT', 'YOU',
+  'SURE', 'YOU ARE', 'YOUR', "YOU'RE", 'NEXT', 'UH HUH', 'UR', 'HOLD',
   'WHAT?', 'DONE', 'U'
 ];
 
-const WHOSONFIRST_STEP1: Record<string, number> = {
-  'YES': 0,
-  'FIRST': 1,
-  'DISPLAY': 2,
-  'OKAY': 3,
-  'SAYS': 4,
-  'NOTHING': 5,
-  'BLANK': 0,
-  'NO': 0,
-  'LED': 0,
-  'LEAD': 1,
-  'READ': 2,
-  'RED': 0,
-  'REED': 1,
-  'LEED': 2,
-  'HOLD ON': 3,
-  'YOU': 0,
-  'YOU ARE': 1,
-  'YOUR': 2,
-  "YOU'RE": 3,
-  'UR': 4,
-  'THERE': 5,
-  "THEY'RE": 0,
-  'THEIR': 1,
-  'THEY ARE': 2,
-  'SEE': 0,
-  'C': 1,
-  'CEE': 2,
+const DISPLAY_MAP: Record<string, number> = {
+  "UR": 0, "FIRST": 1, "OKAY": 1, "C": 1, "YES": 2, "NOTHING": 2,
+  "LED": 2, "THEY ARE": 2, "BLANK": 3, "READ": 3, "RED": 3, "YOU": 3,
+  "YOUR": 3, "YOU'RE": 3, "THEIR": 3, "": 4, "REED": 4, "LEED": 4,
+  "THEY'RE": 4, "DISPLAY": 5, "SAYS": 5, "NO": 5, "LEAD": 5,
+  "HOLD ON": 5, "YOU ARE": 5, "THERE": 5, "SEE": 5, "CEE": 5
 };
 
-const WHOSONFIRST_STEP2: Record<string, string[]> = {
-  'READY': ['YES', 'OKAY', 'WHAT', 'MIDDLE', 'LEFT', 'PRESS', 'RIGHT', 'BLANK', 'READY', 'NO', 'FIRST', 'UHHH', 'NOTHING', 'WAIT'],
-  'FIRST': ['LEFT', 'OKAY', 'YES', 'MIDDLE', 'NO', 'RIGHT', 'NOTHING', 'UHHH', 'WAIT', 'READY', 'BLANK', 'WHAT', 'PRESS', 'FIRST'],
-  'NO': ['BLANK', 'UHHH', 'WAIT', 'FIRST', 'WHAT', 'READY', 'RIGHT', 'YES', 'NOTHING', 'LEFT', 'PRESS', 'OKAY', 'NO', 'MIDDLE'],
-  'BLANK': ['WAIT', 'RIGHT', 'OKAY', 'MIDDLE', 'BLANK', 'PRESS', 'READY', 'NOTHING', 'NO', 'WHAT', 'LEFT', 'UHHH', 'YES', 'FIRST'],
-  'NOTHING': ['UHHH', 'RIGHT', 'OKAY', 'MIDDLE', 'YES', 'BLANK', 'NO', 'PRESS', 'LEFT', 'WHAT', 'WAIT', 'FIRST', 'NOTHING', 'READY'],
-  'YES': ['OKAY', 'RIGHT', 'UHHH', 'MIDDLE', 'FIRST', 'WHAT', 'PRESS', 'READY', 'NOTHING', 'YES', 'LEFT', 'BLANK', 'NO', 'WAIT'],
-  'WHAT': ['UHHH', 'WHAT', 'LEFT', 'NOTHING', 'READY', 'BLANK', 'MIDDLE', 'NO', 'OKAY', 'FIRST', 'WAIT', 'YES', 'PRESS', 'RIGHT'],
-  'UHHH': ['READY', 'NOTHING', 'LEFT', 'WHAT', 'OKAY', 'YES', 'RIGHT', 'NO', 'PRESS', 'BLANK', 'UHHH', 'MIDDLE', 'WAIT', 'FIRST'],
-  'LEFT': ['RIGHT', 'LEFT', 'FIRST', 'NO', 'MIDDLE', 'YES', 'BLANK', 'WHAT', 'UHHH', 'WAIT', 'PRESS', 'READY', 'OKAY', 'NOTHING'],
-  'RIGHT': ['YES', 'NOTHING', 'READY', 'PRESS', 'NO', 'WAIT', 'WHAT', 'RIGHT', 'MIDDLE', 'LEFT', 'UHHH', 'BLANK', 'OKAY', 'FIRST'],
-  'MIDDLE': ['BLANK', 'READY', 'OKAY', 'WHAT', 'NOTHING', 'PRESS', 'NO', 'WAIT', 'LEFT', 'MIDDLE', 'RIGHT', 'FIRST', 'UHHH', 'YES'],
-  'OKAY': ['MIDDLE', 'NO', 'FIRST', 'YES', 'UHHH', 'NOTHING', 'WAIT', 'OKAY', 'LEFT', 'READY', 'BLANK', 'PRESS', 'WHAT', 'RIGHT'],
-  'WAIT': ['UHHH', 'NO', 'BLANK', 'OKAY', 'YES', 'LEFT', 'FIRST', 'PRESS', 'WHAT', 'WAIT', 'NOTHING', 'READY', 'RIGHT', 'MIDDLE'],
-  'PRESS': ['RIGHT', 'MIDDLE', 'YES', 'READY', 'PRESS', 'OKAY', 'NOTHING', 'UHHH', 'BLANK', 'LEFT', 'FIRST', 'WHAT', 'NO', 'WAIT'],
-  'YOU': ['SURE', 'YOU ARE', 'YOUR', "YOU'RE", 'NEXT', 'UH HUH', 'UR', 'HOLD', 'WHAT?', 'YOU', 'UH UH', 'LIKE', 'DONE', 'U'],
-  'YOU ARE': ['YOUR', 'NEXT', 'LIKE', 'UH HUH', 'WHAT?', 'DONE', 'UH UH', 'HOLD', 'YOU', 'U', "YOU'RE", 'SURE', 'UR', 'YOU ARE'],
-  'YOUR': ['UH UH', 'YOU ARE', 'UH HUH', 'YOUR', 'NEXT', 'UR', 'SURE', 'U', "YOU'RE", 'YOU', 'WHAT?', 'HOLD', 'LIKE', 'DONE'],
-  "YOU'RE": ['YOU', "YOU'RE", 'UR', 'NEXT', 'UH UH', 'YOU ARE', 'U', 'YOUR', 'WHAT?', 'UH HUH', 'SURE', 'DONE', 'LIKE', 'HOLD'],
-  'UR': ['DONE', 'U', 'UR', 'UH HUH', 'WHAT?', 'SURE', 'YOUR', 'HOLD', "YOU'RE", 'LIKE', 'NEXT', 'UH UH', 'YOU ARE', 'YOU'],
-  'U': ['UH HUH', 'SURE', 'NEXT', 'WHAT?', "YOU'RE", 'UR', 'UH UH', 'DONE', 'U', 'YOU', 'LIKE', 'HOLD', 'YOU ARE', 'YOUR'],
-  'UH HUH': ['UH HUH', 'YOUR', 'YOU ARE', 'YOU', 'DONE', 'HOLD', 'UH UH', 'NEXT', 'SURE', 'LIKE', "YOU'RE", 'UR', 'U', 'WHAT?'],
-  'UH UH': ['UR', 'U', 'YOU ARE', "YOU'RE", 'NEXT', 'UH UH', 'DONE', 'YOU', 'UH HUH', 'LIKE', 'YOUR', 'SURE', 'HOLD', 'WHAT?'],
-  'WHAT?': ['YOU', 'HOLD', "YOU'RE", 'YOUR', 'U', 'DONE', 'UH UH', 'LIKE', 'YOU ARE', 'UH HUH', 'UR', 'NEXT', 'WHAT?', 'SURE'],
-  'DONE': ['SURE', 'UH HUH', 'NEXT', 'WHAT?', 'YOUR', 'UR', "YOU'RE", 'HOLD', 'LIKE', 'YOU', 'U', 'YOU ARE', 'UH UH', 'DONE'],
-  'NEXT': ['WHAT?', 'UH HUH', 'UH UH', 'YOUR', 'HOLD', 'SURE', 'NEXT', 'LIKE', 'DONE', 'YOU ARE', 'UR', "YOU'RE", 'U', 'YOU'],
-  'HOLD': ['YOU ARE', 'U', 'DONE', 'UH UH', 'YOU', 'UR', 'SURE', 'WHAT?', "YOU'RE", 'NEXT', 'HOLD', 'UH HUH', 'YOUR', 'LIKE'],
-  'SURE': ['YOU ARE', 'DONE', 'LIKE', "YOU'RE", 'YOU', 'HOLD', 'UH HUH', 'UR', 'SURE', 'U', 'WHAT?', 'NEXT', 'YOUR', 'UH UH'],
-  'LIKE': ["YOU'RE", 'NEXT', 'U', 'UR', 'HOLD', 'DONE', 'UH UH', 'WHAT?', 'UH HUH', 'YOU', 'LIKE', 'SURE', 'YOU ARE', 'YOUR'],
+const PRIORITY_LISTS: Record<string, string[]> = {
+  "READY": ["YES", "OKAY", "WHAT", "MIDDLE", "LEFT", "PRESS", "RIGHT", "BLANK", "READY", "NO", "FIRST", "UHHH", "NOTHING", "WAIT"],
+  "FIRST": ["LEFT", "OKAY", "YES", "MIDDLE", "NO", "RIGHT", "NOTHING", "UHHH", "WAIT", "READY", "BLANK", "WHAT", "PRESS", "FIRST"],
+  "NO": ["BLANK", "UHHH", "WAIT", "FIRST", "WHAT", "READY", "RIGHT", "YES", "NOTHING", "LEFT", "PRESS", "OKAY", "NO", "MIDDLE"],
+  "BLANK": ["WAIT", "RIGHT", "OKAY", "MIDDLE", "BLANK", "PRESS", "READY", "NOTHING", "NO", "WHAT", "LEFT", "UHHH", "YES", "FIRST"],
+  "NOTHING": ["UHHH", "RIGHT", "OKAY", "MIDDLE", "YES", "BLANK", "NO", "PRESS", "LEFT", "WHAT", "WAIT", "FIRST", "NOTHING", "READY"],
+  "YES": ["OKAY", "RIGHT", "UHHH", "MIDDLE", "FIRST", "WHAT", "PRESS", "READY", "NOTHING", "YES", "LEFT", "BLANK", "NO", "WAIT"],
+  "WHAT": ["UHHH", "WHAT", "LEFT", "NOTHING", "READY", "BLANK", "MIDDLE", "NO", "OKAY", "FIRST", "WAIT", "YES", "PRESS", "RIGHT"],
+  "UHHH": ["READY", "NOTHING", "LEFT", "WHAT", "OKAY", "YES", "RIGHT", "NO", "PRESS", "BLANK", "UHHH", "WAIT", "FIRST", "MIDDLE"],
+  "LEFT": ["RIGHT", "LEFT", "READY", "NO", "MIDDLE", "OKAY", "UHHH", "WHAT", "WAIT", "FIRST", "NOTHING", "READY", "BLANK", "YES"],
+  "RIGHT": ["YES", "NOTHING", "READY", "PRESS", "NO", "WAIT", "WHAT", "RIGHT", "MIDDLE", "LEFT", "UHHH", "BLANK", "OKAY", "FIRST"],
+  "MIDDLE": ["BLANK", "READY", "OKAY", "WHAT", "NOTHING", "PRESS", "NO", "WAIT", "LEFT", "MIDDLE", "RIGHT", "FIRST", "UHHH", "YES"],
+  "OKAY": ["MIDDLE", "NO", "FIRST", "YES", "UHHH", "NOTHING", "WAIT", "OKAY", "LEFT", "READY", "BLANK", "PRESS", "WHAT", "RIGHT"],
+  "WAIT": ["UHHH", "NO", "BLANK", "OKAY", "YES", "LEFT", "FIRST", "PRESS", "WHAT", "WAIT", "NOTHING", "READY", "RIGHT", "MIDDLE"],
+  "PRESS": ["RIGHT", "MIDDLE", "YES", "READY", "PRESS", "OKAY", "NOTHING", "UHHH", "BLANK", "LEFT", "FIRST", "WHAT", "NO", "WAIT"],
+  "YOU": ["SURE", "YOU ARE", "YOUR", "YOU'RE", "NEXT", "UH HUH", "UR", "HOLD", "WHAT?", "YOU", "U", "DONE", "UHHH", "LIKE"],
+  "YOU ARE": ["YOUR", "NEXT", "LIKE", "UH HUH", "WHAT?", "DONE", "UHHH", "HOLD", "YOU", "U", "YOU'RE", "SURE", "UR", "YOU ARE"],
+  "YOUR": ["UH HUH", "YOU ARE", "UH UH", "YOUR", "NEXT", "UR", "SURE", "U", "YOU'RE", "YOU", "WHAT?", "HOLD", "LIKE", "DONE"],
+  "YOU'RE": ["YOU", "YOU'RE", "UR", "NEXT", "UH UH", "YOU ARE", "U", "YOUR", "WHAT?", "UH HUH", "DONE", "LIKE", "HOLD", "SURE"],
+  "UR": ["DONE", "U", "UR", "UH HUH", "WHAT?", "SURE", "YOUR", "IT", "HOLD", "YOU'RE", "LIKE", "NEXT", "UH UH", "YOU ARE"],
+  "U": ["UH HUH", "SURE", "NEXT", "WHAT?", "YOU'RE", "UR", "UH UH", "DONE", "U", "YOU", "LIKE", "HOLD", "YOU ARE", "YOUR"],
+  "UH HUH": ["UH HUH", "YOUR", "YOU ARE", "YOU", "DONE", "HOLD", "UH UH", "NEXT", "SURE", "LIKE", "YOU'RE", "UR", "U", "WHAT?"],
+  "UH UH": ["UR", "U", "DONE", "UH UH", "NEXT", "YOU", "YOU'RE", "SURE", "HOLD", "UH HUH", "YOUR", "IT", "WHAT?", "YOU ARE"],
+  "WHAT?": ["YOU", "HOLD", "YOU'RE", "YOUR", "U", "DONE", "UH UH", "LIKE", "YOU ARE", "UH HUH", "UR", "NEXT", "WHAT?", "SURE"],
+  "DONE": ["SURE", "UH HUH", "NEXT", "WHAT?", "YOUR", "UR", "YOU'RE", "HOLD", "LIKE", "YOU", "U", "YOU ARE", "UH UH", "DONE"],
+  "NEXT": ["WHAT?", "UH HUH", "UH UH", "YOUR", "HOLD", "SURE", "NEXT", "LIKE", "DONE", "YOU ARE", "UR", "YOU'RE", "U", "YOU"],
+  "HOLD": ["SURE", "YOU ARE", "NEXT", "DONE", "UH HUH", "UR", "UH UH", "IT", "YOUR", "WHAT?", "YOU", "U", "YOU'RE", "HOLD"],
+  "SURE": ["YOU ARE", "DONE", "LIKE", "YOU'RE", "YOU", "HOLD", "UH HUH", "UR", "SURE", "U", "NEXT", "UH UH", "YOUR", "WHAT?"],
+  "LIKE": ["YOU'RE", "NEXT", "U", "UR", "HOLD", "DONE", "UH UH", "WHAT?", "UH HUH", "YOU", "LIKE", "SURE", "YOU ARE", "YOUR"]
 };
 
 export function generateWhosOnFirst(): WhosOnFirstConfig {
@@ -463,33 +442,25 @@ export function generateWhosOnFirst(): WhosOnFirstConfig {
 }
 
 export function getWhosOnFirstSolution(config: WhosOnFirstConfig): string {
-  const position = WHOSONFIRST_STEP1[config.display];
-  if (position === undefined) return config.buttons[0];
+  const readIndex = DISPLAY_MAP[config.display];
+  if (readIndex === undefined) return config.buttons[0];
   
-  const labelToRead = config.buttons[position];
-  if (!labelToRead) return config.buttons[0];
+  const labelToLookUp = config.buttons[readIndex];
+  if (!labelToLookUp) return config.buttons[0];
   
-  const buttonOrder = WHOSONFIRST_STEP2[labelToRead];
-  if (!buttonOrder) return config.buttons[0];
+  const list = PRIORITY_LISTS[labelToLookUp];
+  if (!list) return config.buttons[0];
   
-  for (const label of buttonOrder) {
-    const idx = config.buttons.indexOf(label);
-    if (idx !== -1) return label;
-  }
-  
-  return config.buttons[0];
+  return list.find(word => config.buttons.includes(word)) || config.buttons[0];
 }
 
 const KEYPAD_COLUMNS: KeypadSymbol[][] = [
-  ['balloon', 'euro', 'copyright', 'six', 'pitchfork'],
-  ['six', 'at', 'balloon', 'pumpkin', 'paragraph'],
-  ['smileyface', 'euro', 'upsidedowny', 'leftc', 'cursive'],
-  ['bt', 'bt', 'tracks', 'squigglyn', 'cursive'],
-  ['doublek', 'squidknife', 'rightc', 'ae', 'squidknife'],
-  ['hollowstar', 'meltedthree', 'doublek', 'paragraph', 'pitchfork'],
-  ['hookn', 'hookn', 'upsidedowny', 'questionmark', 'dragon'],
-  ['nwithhat', 'leftc', 'questionmark', 'hollowstar', 'smileyface'],
-  ['filledstar', 'omega', 'squigglyn', 'whirl', 'wrench'],
+  ['balloon', 'at', 'upsidedowny', 'squigglyn', 'squidknife', 'hookn', 'leftc'],
+  ['euro', 'balloon', 'leftc', 'cursive', 'hollowstar', 'hookn', 'questionmark'],
+  ['copyright', 'pumpkin', 'cursive', 'doublek', 'meltedthree', 'upsidedowny', 'hollowstar'],
+  ['six', 'paragraph', 'bt', 'squidknife', 'doublek', 'questionmark', 'smileyface'],
+  ['pitchfork', 'smileyface', 'bt', 'rightc', 'paragraph', 'dragon', 'filledstar'],
+  ['six', 'euro', 'tracks', 'ae', 'pitchfork', 'nwithhat', 'omega'],
 ];
 
 function shuffle<T>(arr: T[]): T[] {
@@ -502,35 +473,38 @@ function shuffle<T>(arr: T[]): T[] {
 }
 
 export function generateKeypad(): KeypadConfig {
-  const allSymbols: KeypadSymbol[] = [
-    'balloon', 'copyright', 'doublek', 'euro', 'filledstar',
-    'hollowstar', 'hookn', 'meltedthree', 'omega', 'paragraph',
-    'pitchfork', 'six', 'smileyface', 'squidknife', 'squigglyn',
-    'tracks', 'trident', 'upsidedowny', 'at', 'ae', 'cursive',
-    'rightc', 'leftc', 'questionmark', 'pumpkin',
-  ];
-  
-  const shuffled = shuffle(allSymbols).slice(0, 4);
   const column = randomItem(KEYPAD_COLUMNS);
+  const shuffled = shuffle(column).slice(0, 4);
   
   return {
     symbols: shuffled,
     column,
     solved: false,
     pressed: -1,
+    pressedSymbols: [],
   };
+}
+
+export function solveKeypad(inputSymbols: KeypadSymbol[]): KeypadSymbol[] {
+  const matchingColumn = KEYPAD_COLUMNS.find(col =>
+    inputSymbols.every(sym => col.includes(sym))
+  );
+  
+  if (!matchingColumn) return inputSymbols;
+  
+  return [...inputSymbols].sort((a, b) => 
+    matchingColumn.indexOf(a) - matchingColumn.indexOf(b)
+  );
 }
 
 export function checkKeypadOrder(config: KeypadConfig, symbol: KeypadSymbol): boolean {
   if (config.solved) return false;
   
+  const expectedOrder = solveKeypad(config.symbols);
   const currentIndex = config.pressed + 1;
-  const expectedSymbol = config.column[currentIndex];
+  const expectedSymbol = expectedOrder[currentIndex];
   
-  if (symbol === expectedSymbol) {
-    return true;
-  }
-  return false;
+  return symbol === expectedSymbol;
 }
 
 export type Bomb = {
