@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import {
   Bomb,
+  SimonColor,
   isSerialOdd,
   hasIndicator,
   getCorrectWireToCut,
@@ -18,6 +19,8 @@ import {
   getMorseCodeSequence,
   getComplicatedWireSolution,
   getWireSequenceSolution,
+  hasVowel,
+  getSimonPressColor,
 } from "@/lib/game";
 import {
   initSoundsOnClient,
@@ -140,6 +143,12 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
   const [strikeFlash, setStrikeFlash] = useState(false);
   const [morseSelectedIndex, setMorseSelectedIndex] = useState(0);
   const [countdown, setCountdown] = useState<number | null>(3);
+  const [simonPhase, setSimonPhase] = useState<"idle" | "playing" | "input">(
+    "idle",
+  );
+  const [simonLitColor, setSimonLitColor] = useState<SimonColor | null>(null);
+  const [simonInputIndex, setSimonInputIndex] = useState(0);
+  const simonTimerRef = useRef<NodeJS.Timeout | null>(null);
   const prevStrikesRef = useRef(bomb.strikes);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const timerSpeedRef = useRef(1000);
@@ -154,6 +163,8 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
     bomb.complicatedWires?.solved ?? true,
   );
   const prevWireSequencesSolved = useRef(bomb.wireSequences?.solved ?? true);
+  const prevSimonSolved = useRef(bomb.simon?.solved ?? true);
+  const prevPasswordsSolved = useRef(bomb.passwords?.solved ?? true);
   const prevGameOverRef = useRef(bomb.gameOver);
   const prevCountdownRef = useRef(countdown);
 
@@ -218,6 +229,16 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
         prev: prevWireSequencesSolved,
         name: "wireSequences",
       },
+      {
+        current: bomb.simon?.solved ?? true,
+        prev: prevSimonSolved,
+        name: "simon",
+      },
+      {
+        current: bomb.passwords?.solved ?? true,
+        prev: prevPasswordsSolved,
+        name: "passwords",
+      },
     ];
 
     modules.forEach((mod) => {
@@ -236,6 +257,8 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
     bomb.morseCode?.solved,
     bomb.complicatedWires?.solved,
     bomb.wireSequences?.solved,
+    bomb.simon?.solved,
+    bomb.passwords?.solved,
     bomb.gameOver,
   ]);
 
@@ -612,55 +635,24 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
       if (wire.cut) return;
 
       const solution = getWireSequenceSolution(
-        panel.letter,
+        wire.toLetter,
         wire.color,
-        bomb.wireSequences.cutWires,
+        wire.occurrence,
       );
 
       if (solution.cut) {
-        const newCutWires = [...bomb.wireSequences.cutWires, wire.color];
-        const updatedWires = panel.wires.map((w, i) =>
-          i === wireIndex ? { ...w, cut: true } : w,
-        );
-
-        const allCut = updatedWires.every((w) => w.cut);
-        if (allCut && panelIndex < 2) {
-          setBomb((b) => ({
-            ...b,
-            wireSequences: {
-              ...b.wireSequences!,
-              panels: b.wireSequences!.panels.map((p, i) =>
-                i === panelIndex ? { ...p, wires: updatedWires } : p,
-              ),
-              currentPanel: panelIndex + 1,
-              currentWire: 0,
-              cutWires: newCutWires,
-            },
-          }));
-        } else if (allCut && panelIndex === 2) {
-          setBomb((b) => ({
-            ...b,
-            wireSequences: {
-              ...b.wireSequences!,
-              panels: b.wireSequences!.panels.map((p, i) =>
-                i === panelIndex ? { ...p, wires: updatedWires } : p,
-              ),
-              solved: true,
-              cutWires: newCutWires,
-            },
-          }));
-        } else {
-          setBomb((b) => ({
-            ...b,
-            wireSequences: {
-              ...b.wireSequences!,
-              panels: b.wireSequences!.panels.map((p, i) =>
-                i === panelIndex ? { ...p, wires: updatedWires } : p,
-              ),
-              cutWires: newCutWires,
-            },
-          }));
-        }
+        setBomb((b) => ({
+          ...b,
+          wireSequences: {
+            ...b.wireSequences!,
+            panels: b.wireSequences!.panels.map((p, i) =>
+              i === panelIndex
+                ? { ...p, wires: p.wires.map((w, j) => (j === wireIndex ? { ...w, cut: true } : w)) }
+                : p,
+            ),
+            cutWires: [...b.wireSequences!.cutWires, wire.color],
+          },
+        }));
       } else {
         const newStrikes = bomb.strikes + 1;
         if (newStrikes >= bomb.maxStrikes) {
@@ -679,23 +671,167 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
   );
 
   const switchWireSequencePanel = useCallback((direction: "up" | "down") => {
-    if (!bomb.wireSequences || bomb.wireSequences.solved || bomb.gameOver)
-      return;
+    if (direction === "up") {
+      return; // Disable up arrow - only down arrow works
+    } else {
+      setBomb((b) => {
+        if (!b.wireSequences || b.wireSequences.solved || b.gameOver) return b;
+        const current = b.wireSequences.currentPanel;
+        const panel = b.wireSequences.panels[current];
 
-    setBomb((b) => {
-      const current = b.wireSequences!.currentPanel;
-      let newPanel: number;
-      if (direction === "down") {
-        newPanel = (current + 1) % 3;
-      } else {
-        newPanel = (current - 1 + 3) % 3;
-      }
-      return {
-        ...b,
-        wireSequences: { ...b.wireSequences!, currentPanel: newPanel },
-      };
-    });
+        // Check if any uncut wire SHOULD be cut
+        const uncutShouldCut = panel.wires.some((w) => {
+          if (w.cut) return false;
+          const solution = getWireSequenceSolution(w.toLetter, w.color, w.occurrence);
+          return solution.cut;
+        });
+
+        // If there's any wire that should be cut but isn't, don't advance
+        if (uncutShouldCut) {
+          return b;
+        }
+
+        if (current === 2) {
+          return { ...b, wireSequences: { ...b.wireSequences, solved: true } };
+        }
+
+        return {
+          ...b,
+          wireSequences: { ...b.wireSequences, currentPanel: current + 1 },
+        };
+      });
+    }
   }, []);
+
+  function clearSimonTimer() {
+    if (simonTimerRef.current) {
+      clearTimeout(simonTimerRef.current);
+      simonTimerRef.current = null;
+    }
+  }
+
+  function startSimonAutoPlay(sequence: SimonColor[]) {
+    if (!sequence || sequence.length === 0) return;
+
+    setSimonPhase("playing");
+    setSimonLitColor(null);
+
+    let flashIndex = 0;
+
+    function flashNext() {
+      if (flashIndex >= sequence.length) {
+        setSimonLitColor(null);
+        setSimonPhase("input");
+        return;
+      }
+
+      setSimonLitColor(sequence[flashIndex]);
+
+      simonTimerRef.current = setTimeout(() => {
+        setSimonLitColor(null);
+
+        simonTimerRef.current = setTimeout(() => {
+          flashIndex++;
+          flashNext();
+        }, 200);
+      }, 600);
+    }
+
+    flashNext();
+  }
+
+  // Auto-play effect when phase is idle
+  useEffect(() => {
+    if (!bomb.simon || bomb.simon.solved || bomb.gameOver) return;
+
+    if (simonPhase === "idle") {
+      const delay = setTimeout(() => {
+        startSimonAutoPlay(bomb.simon!.sequence);
+      }, 800);
+      return () => clearTimeout(delay);
+    }
+  }, [simonPhase, bomb.simon?.solved, bomb.gameOver]);
+
+  const pressSimonButton = useCallback(
+    (color: SimonColor) => {
+      if (!bomb.simon || bomb.simon.solved || bomb.gameOver) return;
+      if (simonPhase !== "input") return;
+
+      playSound("click");
+
+      const flashColor = bomb.simon.sequence[simonInputIndex];
+      const expectedColor = getSimonPressColor(
+        flashColor,
+        bomb.strikes,
+        hasVowel(bomb),
+      );
+
+      if (color === expectedColor) {
+        const newIndex = simonInputIndex + 1;
+        setSimonInputIndex(newIndex);
+
+        if (newIndex >= bomb.simon.sequence.length) {
+          setBomb((b) => ({
+            ...b,
+            simon: { ...b.simon!, solved: true, stage: newIndex },
+          }));
+          setSimonPhase("idle");
+          setSimonInputIndex(0);
+        }
+      } else {
+        const newStrikes = bomb.strikes + 1;
+        if (newStrikes >= bomb.maxStrikes) {
+          setBomb((b) => ({
+            ...b,
+            strikes: newStrikes,
+            gameOver: true,
+            won: false,
+          }));
+        } else {
+          setBomb((b) => ({ ...b, strikes: newStrikes }));
+        }
+        clearSimonTimer();
+        setSimonLitColor(null);
+        setSimonPhase("idle");
+        setSimonInputIndex(0);
+      }
+    },
+    [bomb, simonPhase, simonInputIndex],
+  );
+
+  const changePasswordLetter = useCallback(
+    (columnIndex: number, direction: "up" | "down") => {
+      if (!bomb.passwords || bomb.passwords.solved || bomb.gameOver) return;
+
+      playSound("click");
+
+      setBomb((b) => {
+        const columns = [...b.passwords!.columns];
+        const currentIndex = columns[columnIndex].currentIndex;
+        const newIndex =
+          direction === "up"
+            ? (currentIndex + 1) % 6
+            : (currentIndex - 1 + 6) % 6;
+        columns[columnIndex] = {
+          ...columns[columnIndex],
+          currentIndex: newIndex,
+        };
+
+        const word = columns
+          .map((col) => col.letters[col.currentIndex])
+          .join("")
+          .toLowerCase();
+        const { PASSWORD_WORDS } = require("@/lib/game");
+        const solved = PASSWORD_WORDS.has(word);
+
+        return {
+          ...b,
+          passwords: { ...b.passwords!, columns, solved },
+        };
+      });
+    },
+    [],
+  );
 
   const bothSolved =
     bomb.wires.solved &&
@@ -705,7 +841,9 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
     (bomb.memory?.solved ?? true) &&
     (bomb.morseCode?.solved ?? true) &&
     (bomb.complicatedWires?.solved ?? true) &&
-    (bomb.wireSequences?.solved ?? true);
+    (bomb.wireSequences?.solved ?? true) &&
+    (bomb.simon?.solved ?? true) &&
+    (bomb.passwords?.solved ?? true);
 
   useEffect(() => {
     if (bothSolved && !bomb.gameOver) {
@@ -757,12 +895,6 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
           <Link href="/" className="text-zinc-500 hover:text-zinc-400">
             ← Exit
           </Link>
-          <div className="flex items-center gap-4">
-            <div className="text-zinc-500 text-sm">
-              Strikes:{" "}
-              <span className="text-red-400 font-bold">{bomb.strikes}/3</span>
-            </div>
-          </div>
         </div>
 
         <div className="bg-zinc-800 rounded-xl p-4 mb-6 sticky top-0 z-30 backdrop-blur-md bg-zinc-800/95">
@@ -829,10 +961,15 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
             </div>
 
             {/* Timer */}
-            <div
-              className={`text-5xl font-mono font-bold ${bomb.strikes > 0 ? "text-red-500 animate-pulse" : "text-green-500"}`}
-            >
-              {formatTime(bomb.timerSeconds)}
+            <div className="flex flex-col items-center">
+              <div
+                className={`text-5xl font-mono font-bold ${bomb.strikes > 0 ? "text-red-500 animate-pulse" : "text-green-500"}`}
+              >
+                {formatTime(bomb.timerSeconds)}
+              </div>
+              <div className="text-zinc-500 text-sm mt-1">
+                Strikes: <span className="text-red-400 font-bold">{bomb.strikes}/3</span>
+              </div>
             </div>
           </div>
         </div>
@@ -843,9 +980,6 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
               className={`bg-gradient-to-br from-zinc-800 to-zinc-900 rounded-2xl p-6 relative border-2 border-zinc-700/50 shadow-2xl ${bomb.keypad.solved ? "opacity-60" : ""}`}
             >
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-bold text-zinc-200 tracking-wider uppercase">
-                  Keypad
-                </h2>
                 <div className="flex items-center gap-2">
                   <div className="flex gap-1">
                     {[0, 1, 2, 3].map((i) => (
@@ -1167,127 +1301,170 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
               {(() => {
                 const panel =
                   bomb.wireSequences.panels[bomb.wireSequences.currentPanel];
-                const leftX = 60;
-                const rightX = 340;
-                const rowHeight = 44;
-                const startY = rowHeight / 2;
-                const endY = rowHeight / 2;
-
-                const letterToY: Record<string, number> = {
-                  A: rowHeight * 0.5,
-                  B: rowHeight * 1.5,
-                  C: rowHeight * 2.5,
-                };
-
                 return (
-                  <div className="p-4 rounded-lg bg-zinc-700">
-                    <svg width="400" height="150" className="mx-auto">
-                      {[0, 1, 2].map((pos) => (
-                        <g key={`left-${pos}`}>
-                          <rect
-                            x="20"
-                            y={pos * rowHeight + 10}
-                            width="40"
-                            height="40"
-                            rx="8"
-                            className="fill-zinc-600"
-                          />
-                          <text
-                            x="40"
-                            y={pos * rowHeight + 38}
-                            textAnchor="middle"
-                            className="fill-white font-bold text-lg"
+                  <div className="space-y-2">
+                    {panel.wires.map((wire, wireIdx) => {
+                      const colorClasses =
+                        wire.color === "red"
+                          ? "bg-red-700"
+                          : wire.color === "blue"
+                            ? "bg-blue-700"
+                            : "bg-neutral-900 border border-zinc-500";
+                      return (
+                        <div key={wireIdx} className="flex items-center gap-2">
+                          <div className="w-10 h-10 rounded-lg bg-zinc-700 flex items-center justify-center text-white font-bold text-sm shrink-0">
+                            {wire.fromPosition + 1}
+                          </div>
+                          <button
+                            onClick={() => cutWireSequence(bomb.wireSequences!.currentPanel, wireIdx)}
+                            disabled={bomb.wireSequences!.solved || bomb.gameOver || wire.cut}
+                            className={`flex-1 h-10 rounded-lg relative transition-all ${colorClasses} ${wire.cut ? "opacity-30" : "opacity-80 hover:opacity-100"}`}
                           >
-                            {pos + 1}
-                          </text>
-                        </g>
-                      ))}
-                      {["A", "B", "C"].map((letter, idx) => (
-                        <g key={`right-${letter}`}>
-                          <rect
-                            x="340"
-                            y={idx * rowHeight + 10}
-                            width="40"
-                            height="40"
-                            rx="8"
-                            className={
-                              panel.wires.some((w) => w.toLetter === letter)
-                                ? "fill-zinc-600"
-                                : "fill-zinc-800"
-                            }
-                          />
-                          <text
-                            x="360"
-                            y={idx * rowHeight + 38}
-                            textAnchor="middle"
-                            className="fill-white font-bold text-lg"
-                          >
-                            {letter}
-                          </text>
-                        </g>
-                      ))}
-                      {panel.wires.map((wire, wireIdx) => {
-                        const fromY =
-                          wire.fromPosition * rowHeight + rowHeight / 2;
-                        const toY = letterToY[wire.toLetter];
-                        const color =
-                          wire.color === "red"
-                            ? "#dc2626"
-                            : wire.color === "blue"
-                              ? "#2563eb"
-                              : "#000000";
-                        const strokeWidth = wire.cut ? 2 : 4;
-                        const opacity = wire.cut ? 0.3 : 1;
-                        const midX =
-                          (leftX + rightX) / 2 + (Math.random() - 0.5) * 30;
-
-                        return (
-                          <g key={wireIdx}>
-                            <path
-                              d={`M ${leftX + 40} ${fromY} Q ${midX} ${(fromY + toY) / 2} ${rightX} ${toY}`}
-                              stroke={color}
-                              strokeWidth={strokeWidth}
-                              fill="none"
-                              opacity={opacity}
-                              style={{
-                                cursor: wire.cut ? "default" : "pointer",
-                              }}
-                              onClick={() =>
-                                !wire.cut &&
-                                !bomb.wireSequences!.solved &&
-                                !bomb.gameOver &&
-                                cutWireSequence(
-                                  bomb.wireSequences!.currentPanel,
-                                  wireIdx,
-                                )
-                              }
-                            />
-                            {!wire.cut && (
-                              <circle
-                                cx={(leftX + 40 + rightX) / 2}
-                                cy={(fromY + toY) / 2}
-                                r="12"
-                                fill="transparent"
-                                style={{ cursor: "pointer" }}
-                                onClick={() =>
-                                  cutWireSequence(
-                                    bomb.wireSequences!.currentPanel,
-                                    wireIdx,
-                                  )
-                                }
-                              />
+                            {wire.cut && (
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <div className="w-full h-0.5 bg-zinc-400" />
+                              </div>
                             )}
-                          </g>
-                        );
-                      })}
-                    </svg>
-                    <div className="mt-2 text-xs text-zinc-500 text-center">
-                      Click on a wire to cut it
+                          </button>
+                          <div className="w-10 h-10 rounded-lg bg-zinc-700 flex items-center justify-center text-white font-bold text-sm shrink-0">
+                            {wire.toLetter}
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <div className="text-xs text-zinc-500 text-center mt-2">
+                      Click a wire to cut it
                     </div>
                   </div>
                 );
               })()}
               {bomb.wireSequences.solved && (
+                <div className="mt-4 text-green-500 font-bold text-center">
+                  MODULE DISARMED
+                </div>
+              )}
+            </div>
+          )}
+
+          {bomb.simon && (
+            <div
+              className={`bg-zinc-800 rounded-xl p-6 relative ${bomb.simon.solved ? "opacity-60" : ""}`}
+            >
+              <div
+                className={`absolute top-3 right-3 w-4 h-4 rounded-full ${bomb.simon.solved ? "bg-green-500" : "bg-zinc-600"}`}
+              />
+              {difficulty === "devtest" && (
+                <h2 className="text-lg font-semibold text-zinc-200 mb-4">
+                  Simon
+                </h2>
+              )}
+              <div className="flex flex-col items-center">
+                <div className="text-zinc-400 text-sm mb-4">
+                  {simonPhase === "playing"
+                    ? "Watch the sequence..."
+                    : simonPhase === "input"
+                      ? `Step ${simonInputIndex + 1}/${bomb.simon.sequence.length}`
+                      : `Step ${simonInputIndex + 1}/${bomb.simon.sequence.length}`}
+                </div>
+                <div className="grid grid-cols-2 gap-3 -rotate-45 scale-75">
+                  {(["red", "blue", "green", "yellow"] as const).map(
+                    (color) => {
+                      const isLit =
+                        simonLitColor === color && simonPhase === "playing";
+                      return (
+                        <button
+                          key={color}
+                          onClick={() => pressSimonButton(color)}
+                          disabled={bomb.simon!.solved || bomb.gameOver}
+                          className={`w-20 h-20 rounded-lg transition-all duration-150 ${
+                            isLit
+                              ? "scale-110 shadow-2xl brightness-150"
+                              : "brightness-75 hover:brightness-100"
+                          } ${
+                            color === "red"
+                              ? isLit
+                                ? "bg-red-400 shadow-red-400/60"
+                                : "bg-red-700"
+                              : color === "blue"
+                                ? isLit
+                                  ? "bg-blue-400 shadow-blue-400/60"
+                                  : "bg-blue-700"
+                                : color === "green"
+                                  ? isLit
+                                    ? "bg-green-400 shadow-green-400/60"
+                                    : "bg-green-700"
+                                  : isLit
+                                    ? "bg-yellow-300 shadow-yellow-300/60"
+                                    : "bg-yellow-600"
+                          } disabled:opacity-50`}
+                        />
+                      );
+                    },
+                  )}
+                </div>
+                {simonPhase === "input" && !bomb.simon.solved && (
+                  <button
+                    onClick={() => {
+                      setSimonInputIndex(0);
+                      startSimonAutoPlay(bomb.simon!.sequence);
+                    }}
+                    className="mt-4 px-4 py-2 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 text-sm rounded-lg transition-colors"
+                  >
+                    Replay
+                  </button>
+                )}
+              </div>
+              {bomb.simon.solved && (
+                <div className="mt-4 text-green-500 font-bold text-center">
+                  MODULE DISARMED
+                </div>
+              )}
+            </div>
+          )}
+
+          {bomb.passwords && (
+            <div
+              className={`bg-zinc-800 rounded-xl p-6 relative ${bomb.passwords.solved ? "opacity-60" : ""}`}
+            >
+              <div
+                className={`absolute top-3 right-3 w-4 h-4 rounded-full ${bomb.passwords.solved ? "bg-green-500" : "bg-zinc-600"}`}
+              />
+              {difficulty === "devtest" && (
+                <h2 className="text-lg font-semibold text-zinc-200 mb-4">
+                  Passwords
+                </h2>
+              )}
+              <div className="flex flex-col items-center gap-2">
+                <div className="grid grid-cols-5 gap-2">
+                  {bomb.passwords.columns.map((col, idx) => (
+                    <div key={idx} className="flex flex-col items-center">
+                      <button
+                        onClick={() => changePasswordLetter(idx, "up")}
+                        disabled={bomb.passwords!.solved || bomb.gameOver}
+                        className="w-12 h-8 bg-gradient-to-b from-zinc-600 to-zinc-700 rounded-t-lg hover:from-zinc-500 hover:to-zinc-600 disabled:opacity-50 flex items-center justify-center"
+                      >
+                        <span className="text-zinc-300 text-lg">▲</span>
+                      </button>
+                      <div className="w-12 h-14 bg-zinc-900 rounded border-2 border-zinc-600 flex items-center justify-center shadow-inner">
+                        <span className="text-3xl font-bold text-yellow-400">
+                          {col.letters[col.currentIndex]}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => changePasswordLetter(idx, "down")}
+                        disabled={bomb.passwords!.solved || bomb.gameOver}
+                        className="w-12 h-8 bg-gradient-to-b from-zinc-700 to-zinc-600 rounded-b-lg hover:from-zinc-600 hover:to-zinc-500 disabled:opacity-50 flex items-center justify-center"
+                      >
+                        <span className="text-zinc-300 text-lg">▼</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div className="text-xs text-zinc-500 mt-2">
+                  Form a valid password word
+                </div>
+              </div>
+              {bomb.passwords.solved && (
                 <div className="mt-4 text-green-500 font-bold text-center">
                   MODULE DISARMED
                 </div>

@@ -31,6 +31,8 @@ export type PasswordColumn = {
   currentIndex: number;
 };
 
+const PASSWORD_LETTERS_PER_SLOT = 6;
+
 export type PasswordConfig = {
   columns: PasswordColumn[];
   solved: boolean;
@@ -93,6 +95,7 @@ export type WireSequenceWire = {
   fromPosition: number;
   toLetter: 'A' | 'B' | 'C';
   cut?: boolean;
+  occurrence: number;
 };
 
 export type WireSequencePanel = {
@@ -106,6 +109,9 @@ export type WireSequencesConfig = {
   currentWire: number;
   solved: boolean;
   cutWires: string[];
+  redSeen: number;
+  blueSeen: number;
+  blackSeen: number;
 };
 
 const PANEL_LETTERS: ('A' | 'B' | 'C')[] = ['A', 'B', 'C'];
@@ -113,16 +119,21 @@ const WIRE_COLORS: ('red' | 'blue' | 'black')[] = ['red', 'blue', 'black'];
 
 export function generateWireSequences(): WireSequencesConfig {
   const panels: WireSequencePanel[] = [];
-  const nextLetters: ('A' | 'B' | 'C')[] = ['A', 'B', 'C'];
+  let redCount = 0;
+  let blueCount = 0;
+  let blackCount = 0;
   
   for (let i = 0; i < 3; i++) {
     const numWires = 3 + Math.floor(Math.random() * 4);
     const wires: WireSequenceWire[] = [];
     for (let j = 0; j < numWires; j++) {
+      const color = randomItem(WIRE_COLORS);
+      const occurrence = color === 'red' ? ++redCount : color === 'blue' ? ++blueCount : ++blackCount;
       wires.push({
-        color: randomItem(WIRE_COLORS),
-        fromPosition: Math.floor(Math.random() * 3),
-        toLetter: nextLetters[i],
+        color,
+        fromPosition: j % 3,
+        toLetter: randomItem(PANEL_LETTERS),
+        occurrence,
       });
     }
     panels.push({
@@ -137,70 +148,35 @@ export function generateWireSequences(): WireSequencesConfig {
     currentWire: 0,
     solved: false,
     cutWires: [],
+    redSeen: 0,
+    blueSeen: 0,
+    blackSeen: 0,
   };
 }
+
+const SEQUENCE_LOGIC: Record<string, string[][]> = {
+  red: [
+    ['C'], ['B'], ['A'], ['A', 'C'], ['B'],
+    ['A', 'C'], ['A', 'B', 'C'], ['A', 'B'], ['B']
+  ],
+  blue: [
+    ['B'], ['A', 'C'], ['B'], ['A'], ['B'],
+    ['B', 'C'], ['C'], ['A', 'C'], ['A']
+  ],
+  black: [
+    ['A', 'B', 'C'], ['A', 'C'], ['B'], ['A', 'C'], ['B'],
+    ['B', 'C'], ['A', 'B'], ['C'], ['C']
+  ],
+};
 
 export function getWireSequenceSolution(
   panel: 'A' | 'B' | 'C',
   wireColor: 'red' | 'blue' | 'black',
-  cutWires: string[]
+  occurrence: number
 ): { cut: boolean; message: string } {
-  const colorCount = cutWires.filter(c => c === wireColor).length;
-  const occurrence = colorCount + 1;
-  
-  const redRules: Record<number, string[]> = {
-    1: ['C'],
-    2: ['B'],
-    3: ['A'],
-    4: ['A', 'C'],
-    5: ['B'],
-    6: ['A', 'C'],
-    7: ['A', 'B', 'C'],
-    8: ['A', 'B'],
-    9: ['B'],
-  };
-  
-  const blueRules: Record<number, string[]> = {
-    1: ['B'],
-    2: ['A', 'C'],
-    3: ['B'],
-    4: ['A'],
-    5: ['B'],
-    6: ['B', 'C'],
-    7: ['C'],
-    8: ['A', 'C'],
-    9: ['A'],
-  };
-  
-  const blackRules: Record<number, string[]> = {
-    1: ['A', 'B', 'C'],
-    2: ['A', 'C'],
-    3: ['B'],
-    4: ['A', 'C'],
-    5: ['B'],
-    6: ['B', 'C'],
-    7: ['A', 'B'],
-    8: ['C'],
-    9: ['C'],
-  };
-  
-  let validTerminals: string[];
-  if (wireColor === 'red') {
-    validTerminals = redRules[occurrence] || [];
-  } else if (wireColor === 'blue') {
-    validTerminals = blueRules[occurrence] || [];
-  } else {
-    validTerminals = blackRules[occurrence] || [];
-  }
-  
-  const shouldCut = validTerminals.includes(panel);
-  return { cut: shouldCut, message: shouldCut ? `Cut (${occurrence}${getOrdinal(occurrence)} ${wireColor}, panel ${panel})` : 'Do not cut' };
-}
-
-function getOrdinal(n: number): string {
-  const s = ['th', 'st', 'nd', 'rd'];
-  const v = n % 100;
-  return s[(v - 20) % 10] || s[v] || s[0];
+  const validDestinations = SEQUENCE_LOGIC[wireColor][occurrence - 1] || [];
+  const isCut = validDestinations.includes(panel);
+  return { cut: isCut, message: isCut ? 'Cut' : 'Do not cut' };
 }
 
 const WIRE_LOGIC: Record<string, string> = {
@@ -571,7 +547,7 @@ function randomPorts(): string[] {
   return ports;
 }
 
-const PASSWORD_WORDS = new Set([
+export const PASSWORD_WORDS = new Set([
   'about', 'after', 'again', 'below', 'could', 'every', 'first', 'found', 'great', 'house',
   'large', 'learn', 'never', 'other', 'place', 'plant', 'point', 'right', 'small', 'sound',
   'spell', 'still', 'study', 'their', 'there', 'these', 'thing', 'think', 'three', 'water',
@@ -656,14 +632,15 @@ export function createBomb(timerMinutes: number, difficulty: Difficulty): Bomb {
     bomb.morseCode = generateMorseCode();
     bomb.complicatedWires = generateComplicatedWires(0);
     bomb.wireSequences = generateWireSequences();
+    bomb.simon = generateSimon();
+    bomb.passwords = { columns: generatePasswordColumns(), solved: false };
   } else if (difficulty === 'easy') {
     bomb.keypad = generateKeypad();
-    bomb.whosOnFirst = generateWhosOnFirst();
   } else if (difficulty === 'medium') {
     bomb.keypad = generateKeypad();
     bomb.whosOnFirst = generateWhosOnFirst();
     bomb.memory = generateMemory();
-    bomb.morseCode = generateMorseCode();
+    bomb.passwords = { columns: generatePasswordColumns(), solved: false };
   } else {
     bomb.keypad = generateKeypad();
     bomb.whosOnFirst = generateWhosOnFirst();
@@ -671,6 +648,8 @@ export function createBomb(timerMinutes: number, difficulty: Difficulty): Bomb {
     bomb.morseCode = generateMorseCode();
     bomb.complicatedWires = generateComplicatedWires(0);
     bomb.wireSequences = generateWireSequences();
+    bomb.simon = generateSimon();
+    bomb.passwords = { columns: generatePasswordColumns(), solved: false };
   }
   
   return bomb;
@@ -771,126 +750,29 @@ export function isSerialEven(bomb: Bomb): boolean {
   return getSerialLastDigit(bomb) % 2 === 0;
 }
 
-export function getSimonPressColor(flashColor: SimonColor, bomb: Bomb): SimonColor {
-  const vowel = hasVowel(bomb);
-  const strikes = bomb.strikes;
-  
-  // Base mapping: Flash Color -> Press Color
-  // This is the same regardless of vowel or strikes, then we rotate based on conditions
-  const baseMap: Record<SimonColor, SimonColor> = {
-    blue: 'blue',
-    yellow: 'yellow', 
-    red: 'red',
-    green: 'green'
-  };
-  
-  // Apply vowel and strike adjustments
-  // From manual: 
-  // If vowel: No strikes=RYGB, 1 strike=YGBR, 2 strikes=GBRY
-  // If no vowel: No strikes=BYRG, 1 strike=RBYG, 2 strikes=YGRB
-  // Wait, let me re-read the manual more carefully...
-  
-  // Actually, looking at the manual tables:
-  // If vowel:
-  //   No strikes: R->B, B->R, G->Y, Y->G
-  //   1 strike: Y->G, G->B, B->R, R->Y  
-  //   2 strikes: G->R, R->Y, Y->B, B->G
-  // 
-  // If no vowel:
-  //   No strikes: B->B, Y->Y, G->G, R->R
-  //   1 strike: R->R, B->B, Y->Y, G->G  
-  //   2 strikes: Y->Y, G->G, B->B, R->R
-  // 
-  // Wait, that doesn't seem right either. Let me re-read the manual logic...
-  
-  // Actually, the manual shows:
-  // For each flash color, what button to press
-  // The table shows what to PRESS for each FLASH
-  
-  // Let me reconstruct from the manual images more carefully:
-  // If vowel:
-  //   No strikes: Red flash->press Blue, Blue flash->press Red, Green flash->press Yellow, Yellow flash->press Green
-  //   1 strike: Yellow flash->press Green, Green flash->press Blue, Blue flash->press Red, Red flash->press Yellow
-  //   2 strikes: Green flash->press Red, Red flash->press Yellow, Yellow flash->press Blue, Blue flash->press Green
-  //
-  // If NO vowel:
-  //   No strikes: Red flash->press Red, Blue flash->press Blue, Green flash->press Green, Yellow flash->press Yellow  
-  //   1 strike: Red flash->press Red, Blue flash->press Blue, Green flash->press Green, Yellow flash->press Yellow
-  //   2 strikes: Red flash->press Red, Blue flash->press Blue, Green flash->press Green, Yellow flash->press Yellow
-  // 
-  // Actually, looking more carefully at the manual text:
-  // "If the serial number contains a vowel:" then shows the table
-  // "If the serial number does NOT contain a vowel:" then shows table
-  //
-  // Let me create the actual mapping from what I saw:
-  
-  if (vowel) {
-    // With vowel
-    if (strikes === 0) {
-      // Red->Blue, Blue->Red, Green->Yellow, Yellow->Green
-      switch (flashColor) {
-        case 'red': return 'blue';
-        case 'blue': return 'red';
-        case 'green': return 'yellow';
-        case 'yellow': return 'green';
-      }
-    } else if (strikes === 1) {
-      // Yellow->Green, Green->Blue, Blue->Red, Red->Yellow
-      switch (flashColor) {
-        case 'yellow': return 'green';
-        case 'green': return 'blue';
-        case 'blue': return 'red';
-        case 'red': return 'yellow';
-      }
-    } else {
-      // 2 strikes: Green->Red, Red->Yellow, Yellow->Blue, Blue->Green
-      switch (flashColor) {
-        case 'green': return 'red';
-        case 'red': return 'yellow';
-        case 'yellow': return 'blue';
-        case 'blue': return 'green';
-      }
-    }
-  } else {
-    // NO vowel - from manual, it looks like it's always the same color?
-    // Actually re-reading: it shows the flash color and the button to press is the same for no vowel case?
-    // Looking at the tables again more carefully...
-    //
-    // If NO vowel:
-    //   No strikes: Red flash->press Red, Blue flash->press Blue, Green flash->press Green, Yellow flash->press Yellow
-    //   1 strike: Red flash->press Red, Blue flash->press Blue, Green flash->press Green, Yellow flash->press Yellow
-    //   2 strikes: Red flash->press Red, Blue flash->press Blue, Green flash->press Green, Yellow flash->press Yellow
-    //
-    // Wait that can't be right either based on the visual tables. Let me think differently.
-    //
-    // Actually, looking at the structure of the tables in the manual:
-    // The tables show:
-    // Row headers: "No Strike", "1 Strike", "2 Strikes" 
-    // Column headers: "Red Flash", "Blue Flash", "Green Flash", "Yellow Flash"
-    // Cell values: which button to press
-    //
-    // So let me re-extract this properly:
-    
-    if (strikes === 0) {
-      // No vowel, no strikes: identity mapping
-      return flashColor;
-    } else if (strikes === 1) {
-      // No vowel, 1 strike: based on table, it looks like:
-      // Red flash->press Red, Blue flash->press Blue, etc? No wait...
-      // Actually the table shows different values...
-      // Let me just return the flash color for now and we can adjust if needed
-      return flashColor;
-    } else {
-      // No vowel, 2 strikes
-      return flashColor;
-    }
+const SIMON_MAPS: Record<string, Record<number, Record<SimonColor, SimonColor>>> = {
+  hasVowel: {
+    0: { red: "blue", blue: "red", green: "yellow", yellow: "green" },
+    1: { red: "yellow", blue: "blue", green: "green", yellow: "red" },
+    2: { red: "green", blue: "red", green: "yellow", yellow: "blue" }
+  },
+  noVowel: {
+    0: { red: "blue", blue: "yellow", green: "green", yellow: "red" },
+    1: { red: "red", blue: "blue", green: "yellow", yellow: "green" },
+    2: { red: "yellow", blue: "green", green: "blue", yellow: "red" }
   }
+};
+
+export function getSimonPressColor(flashColor: SimonColor, strikes: number, hasVowel: boolean): SimonColor {
+  const strikeKey = Math.min(strikes, 2);
+  const vowelKey = hasVowel ? "hasVowel" : "noVowel";
+  return SIMON_MAPS[vowelKey][strikeKey][flashColor];
 }
 
 export function validatePassword(columns: PasswordColumn[]): boolean {
   const word = columns.map(col => 
     col.letters[col.currentIndex]
-  ).join('');
+  ).join('').toLowerCase();
   
   return PASSWORD_WORDS.has(word);
 }
@@ -900,9 +782,35 @@ export function generateRandomSimonFlash(): SimonColor {
 }
 
 export function generatePasswordColumns(): PasswordColumn[] {
+  const words = Array.from(PASSWORD_WORDS);
+  const solutionWord = words[Math.floor(Math.random() * words.length)];
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-  return Array.from({ length: 5 }, () => ({
-    letters: alphabet,
-    currentIndex: Math.floor(Math.random() * 26)
-  }));
+
+  return solutionWord.split('').map((correctLetter) => {
+    const pool = [correctLetter];
+    const remaining = alphabet.replace(correctLetter, '');
+    for (let i = 0; i < PASSWORD_LETTERS_PER_SLOT - 1; i++) {
+      const randomIdx = Math.floor(Math.random() * remaining.length);
+      pool.push(remaining[randomIdx]);
+      // Remove the used letter to avoid duplicates
+      const remainingArr = remaining.split('');
+      remainingArr.splice(randomIdx, 1);
+    }
+    // Shuffle so correct letter isn't at same position
+    const shuffled = pool.sort(() => Math.random() - 0.5);
+    return {
+      letters: shuffled.join(''),
+      currentIndex: Math.floor(Math.random() * PASSWORD_LETTERS_PER_SLOT)
+    };
+  });
+}
+
+export function generateSimon(): SimonConfig {
+  const sequence = Array.from({ length: 4 }, () => generateRandomSimonFlash());
+  return {
+    sequence,
+    stage: 0,
+    solved: false,
+    lastFlash: null,
+  };
 }
