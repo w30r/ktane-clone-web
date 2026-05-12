@@ -74,8 +74,10 @@ export type MorseCodeConfig = {
   solved: boolean;
 };
 
+export type ComplicatedWireColor = 'red' | 'blue' | 'yellow' | 'white' | 'black' | 'redblue';
+
 export type ComplicatedWire = {
-  color: 'red' | 'blue' | 'yellow' | 'white' | 'black';
+  color: ComplicatedWireColor;
   hasLED: boolean;
   hasStar: boolean;
   cut: boolean;
@@ -201,8 +203,50 @@ function getOrdinal(n: number): string {
   return s[(v - 20) % 10] || s[v] || s[0];
 }
 
+const WIRE_LOGIC: Record<string, string> = {
+  "0000": "C",
+  "0001": "D",
+  "0010": "C",
+  "0011": "B",
+  "1000": "S",
+  "1001": "B",
+  "1010": "C",
+  "1011": "B",
+  "0100": "S",
+  "0101": "P",
+  "0110": "D",
+  "0111": "P",
+  "1100": "S",
+  "1101": "S",
+  "1110": "P",
+  "1111": "D",
+};
+
+export function shouldCutWire(wire: ComplicatedWire, bomb: Bomb): boolean {
+  const isRed = wire.color === 'red' || wire.color === 'redblue';
+  const isBlue = wire.color === 'blue' || wire.color === 'redblue';
+  
+  const key = `${isRed ? '1' : '0'}${isBlue ? '1' : '0'}${wire.hasStar ? '1' : '0'}${wire.hasLED ? '1' : '0'}`;
+  const action = WIRE_LOGIC[key] || "D";
+  
+  const serialIsEven = !isSerialOdd(bomb);
+  
+  switch (action) {
+    case 'C': return true;
+    case 'D': return false;
+    case 'S': return serialIsEven;
+    case 'P': return bomb.ports.includes('Parallel');
+    case 'B': return bomb.batteries >= 2;
+    default: return false;
+  }
+}
+
+export function getComplicatedWireSolution(wires: ComplicatedWire[], bomb: Bomb): boolean[] {
+  return wires.map(wire => shouldCutWire(wire, bomb));
+}
+
 export function generateComplicatedWires(seed: number): ComplicatedWiresConfig {
-  const colors: ComplicatedWire['color'][] = ['red', 'blue', 'yellow', 'white', 'black'];
+  const colors: ComplicatedWireColor[] = ['red', 'blue', 'yellow', 'white', 'black', 'redblue'];
   const numWires = 6 + Math.floor(Math.random() * 3);
   const wires: ComplicatedWire[] = [];
   
@@ -216,29 +260,6 @@ export function generateComplicatedWires(seed: number): ComplicatedWiresConfig {
   }
   
   return { wires, solved: false };
-}
-
-export function getComplicatedWireSolution(wires: ComplicatedWire[], serialNumber: string): number {
-  const serialLastDigit = parseInt(serialNumber.slice(-1));
-  const redWires = wires.map((w, i) => ({ ...w, index: i })).filter(w => w.color === 'red');
-  const blueWires = wires.map((w, i) => ({ ...w, index: i })).filter(w => w.color === 'blue');
-  const yellowWires = wires.map((w, i) => ({ ...w, index: i })).filter(w => w.color === 'yellow');
-  const whiteWires = wires.map((w, i) => ({ ...w, index: i })).filter(w => w.color === 'white');
-  
-  const lastWire = wires[wires.length - 1];
-  const hasLED = wires.some(w => w.hasLED);
-  
-  if (redWires.length === 0) return 1;
-  if (lastWire.color === 'white' && lastWire.hasLED) return wires.length - 1;
-  if (redWires.length > 1 && (serialLastDigit % 2 === 1)) {
-    const lastRed = redWires[redWires.length - 1];
-    return lastRed.index;
-  }
-  if (blueWires.length === 0) return 2;
-  if (yellowWires.length === 0 && hasLED) return wires.length - 1;
-  if (yellowWires.length > 1) return wires.length - 1;
-  
-  return wires.length - 1;
 }
 
 const MORSE_WORDS = [

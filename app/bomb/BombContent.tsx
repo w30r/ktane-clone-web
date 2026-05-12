@@ -19,6 +19,12 @@ import {
   getComplicatedWireSolution,
   getWireSequenceSolution,
 } from "@/lib/game";
+import {
+  initSoundsOnClient,
+  playSound,
+  startBeepLoop,
+  stopBeepLoop,
+} from "@/lib/sounds";
 
 const SYMBOL_IMAGES: Record<KeypadSymbol, string> = {
   balloon: "🎈",
@@ -84,7 +90,7 @@ const SYMBOL_IMAGE_URLS: Record<KeypadSymbol, string> = {
   leftc: "https://static.wikia.nocookie.net/ktane/images/d/d8/Keypad23.png",
   questionmark:
     "https://static.wikia.nocookie.net/ktane/images/3/34/Keypad20.png",
-  dragon: "https://static.wikia.nocookie.net/ktane/images/1/16/Keypad19.png",
+  dragon: "https://static.wikia.nocookie.net/ktane/images/3/32/Keypad19.png/",
   nwithhat: "https://static.wikia.nocookie.net/ktane/images/d/d4/Keypad18.png/",
   bt: "https://static.wikia.nocookie.net/ktane/images/2/27/Keypad31.png/",
   pumpkin: "https://static.wikia.nocookie.net/ktane/images/9/9e/Keypad08.png",
@@ -105,9 +111,21 @@ const WIRE_COLORS: Record<WireColor, string> = {
 };
 
 const MORSE_FREQUENCIES = [
-  3.505, 3.515, 3.522, 3.532, 3.535, 3.542, 3.545, 3.552, 3.555,
-  3.565, 3.572, 3.575, 3.582, 3.592, 3.595, 3.6,
+  3.505, 3.515, 3.522, 3.532, 3.535, 3.542, 3.545, 3.552, 3.555, 3.565, 3.572,
+  3.575, 3.582, 3.592, 3.595, 3.6,
 ];
+
+const PORT_IMAGES: Record<string, string> = {
+  "DVI-D":
+    "https://static.wikia.nocookie.net/ktane/images/4/46/PortWidget_DVI.svg",
+  Parallel:
+    "https://static.wikia.nocookie.net/ktane/images/6/68/PortWidget_Parallel.svg",
+  Serial: "https://static.wikia.nocookie.net/ktane/images/d/d3/Serial.svg",
+  "PS/2":
+    "https://static.wikia.nocookie.net/ktane/images/b/ba/PortWidget_PS2.svg",
+  "Stereo RCA":
+    "https://static.wikia.nocookie.net/ktane/images/5/55/StereoRCA.svg",
+};
 
 interface Props {
   initialBomb: Bomb;
@@ -121,12 +139,122 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
   const [keypadError, setKeypadError] = useState(false);
   const [strikeFlash, setStrikeFlash] = useState(false);
   const [morseSelectedIndex, setMorseSelectedIndex] = useState(0);
+  const [countdown, setCountdown] = useState<number | null>(3);
   const prevStrikesRef = useRef(bomb.strikes);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const timerSpeedRef = useRef(1000);
 
+  const prevWiresSolved = useRef(bomb.wires.solved);
+  const prevButtonSolved = useRef(bomb.button.solved);
+  const prevKeypadSolved = useRef(bomb.keypad?.solved ?? true);
+  const prevWhosOnFirstSolved = useRef(bomb.whosOnFirst?.solved ?? true);
+  const prevMemorySolved = useRef(bomb.memory?.solved ?? true);
+  const prevMorseCodeSolved = useRef(bomb.morseCode?.solved ?? true);
+  const prevComplicatedWiresSolved = useRef(
+    bomb.complicatedWires?.solved ?? true,
+  );
+  const prevWireSequencesSolved = useRef(bomb.wireSequences?.solved ?? true);
+  const prevGameOverRef = useRef(bomb.gameOver);
+  const prevCountdownRef = useRef(countdown);
+
   useEffect(() => {
+    initSoundsOnClient();
+  }, []);
+
+  // Explode sound
+  useEffect(() => {
+    if (bomb.gameOver && !bomb.won && !prevGameOverRef.current) {
+      playSound("explode", 100);
+    }
+    prevGameOverRef.current = bomb.gameOver;
+  }, [bomb.gameOver, bomb.won]);
+
+  // Beep loop - start when countdown ends, stop when game over
+  useEffect(() => {
+    const countdownEnded =
+      prevCountdownRef.current !== null && countdown === null;
+    if (countdownEnded && !bomb.gameOver) {
+      startBeepLoop(1000);
+    }
     if (bomb.gameOver) {
+      stopBeepLoop();
+    }
+    prevCountdownRef.current = countdown;
+  }, [countdown, bomb.gameOver]);
+
+  useEffect(() => {
+    if (bomb.gameOver) return;
+
+    const modules = [
+      { current: bomb.wires.solved, prev: prevWiresSolved, name: "wires" },
+      { current: bomb.button.solved, prev: prevButtonSolved, name: "button" },
+      {
+        current: bomb.keypad?.solved ?? true,
+        prev: prevKeypadSolved,
+        name: "keypad",
+      },
+      {
+        current: bomb.whosOnFirst?.solved ?? true,
+        prev: prevWhosOnFirstSolved,
+        name: "whosOnFirst",
+      },
+      {
+        current: bomb.memory?.solved ?? true,
+        prev: prevMemorySolved,
+        name: "memory",
+      },
+      {
+        current: bomb.morseCode?.solved ?? true,
+        prev: prevMorseCodeSolved,
+        name: "morseCode",
+      },
+      {
+        current: bomb.complicatedWires?.solved ?? true,
+        prev: prevComplicatedWiresSolved,
+        name: "complicatedWires",
+      },
+      {
+        current: bomb.wireSequences?.solved ?? true,
+        prev: prevWireSequencesSolved,
+        name: "wireSequences",
+      },
+    ];
+
+    modules.forEach((mod) => {
+      const wasSolved = mod.prev.current;
+      if (mod.current && !wasSolved) {
+        playSound("solved", 150);
+      }
+      mod.prev.current = mod.current;
+    });
+  }, [
+    bomb.wires.solved,
+    bomb.button.solved,
+    bomb.keypad?.solved,
+    bomb.whosOnFirst?.solved,
+    bomb.memory?.solved,
+    bomb.morseCode?.solved,
+    bomb.complicatedWires?.solved,
+    bomb.wireSequences?.solved,
+    bomb.gameOver,
+  ]);
+
+  // Countdown effect
+  useEffect(() => {
+    if (countdown === null) return;
+    if (countdown === 0) {
+      setCountdown(null);
+      return;
+    }
+    const timer = setTimeout(() => {
+      setCountdown(countdown - 1);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [countdown]);
+
+  // Timer effect - paused during countdown
+  useEffect(() => {
+    if (bomb.gameOver || countdown !== null) {
       if (intervalRef.current) clearInterval(intervalRef.current);
       return;
     }
@@ -146,7 +274,7 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [bomb.gameOver]);
+  }, [bomb.gameOver, countdown]);
 
   useEffect(() => {
     if (bomb.strikes > 0 && !bomb.gameOver) {
@@ -165,6 +293,7 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
 
   useEffect(() => {
     if (bomb.strikes > prevStrikesRef.current && !bomb.gameOver) {
+      playSound("strike");
       setStrikeFlash(true);
       setTimeout(() => setStrikeFlash(false), 500);
     }
@@ -172,6 +301,7 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
   }, [bomb.strikes, bomb.gameOver]);
 
   const cutWire = useCallback((wireIndex: number) => {
+    playSound("click");
     setBomb((b) => {
       if (b.wires.solved || b.gameOver) return b;
 
@@ -192,6 +322,7 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
   }, []);
 
   const pressButton = useCallback(() => {
+    playSound("click");
     setBomb((b) => {
       if (b.button.solved || b.gameOver) return b;
 
@@ -246,6 +377,7 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
     (symbol: KeypadSymbol) => {
       if (!bomb.keypad || bomb.keypad.solved || bomb.gameOver) return;
 
+      playSound("click");
       const correct = checkKeypadOrder(bomb.keypad!, symbol);
       if (correct) {
         const newPressed = bomb.keypad.pressed + 1;
@@ -294,6 +426,7 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
     (label: string) => {
       if (!bomb.whosOnFirst || bomb.whosOnFirst.solved || bomb.gameOver) return;
 
+      playSound("click");
       const correctLabel = getWhosOnFirstSolution(bomb.whosOnFirst);
       if (label === correctLabel) {
         setBomb((b) => ({
@@ -321,6 +454,7 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
     (position: number, label: string) => {
       if (!bomb.memory || bomb.memory.solved || bomb.gameOver) return;
 
+      playSound("click");
       const solution = getMemorySolution(bomb.memory);
       if (!solution) return;
 
@@ -386,6 +520,7 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
     (freq: number) => {
       if (!bomb.morseCode || bomb.morseCode.solved || bomb.gameOver) return;
 
+      playSound("click");
       if (freq === bomb.morseCode.frequency) {
         setBomb((b) => ({
           ...b,
@@ -408,18 +543,16 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
     [bomb],
   );
 
-  const changeMorseFrequency = useCallback(
-    (direction: "left" | "right") => {
-      setMorseSelectedIndex((prev) => {
-        if (direction === "left") {
-          return prev === 0 ? MORSE_FREQUENCIES.length - 1 : prev - 1;
-        } else {
-          return prev === MORSE_FREQUENCIES.length - 1 ? 0 : prev + 1;
-        }
-      });
-    },
-    [],
-  );
+  const changeMorseFrequency = useCallback((direction: "left" | "right") => {
+    playSound("click");
+    setMorseSelectedIndex((prev) => {
+      if (direction === "left") {
+        return prev === 0 ? MORSE_FREQUENCIES.length - 1 : prev - 1;
+      } else {
+        return prev === MORSE_FREQUENCIES.length - 1 ? 0 : prev + 1;
+      }
+    });
+  }, []);
 
   const cutComplicatedWire = useCallback(
     (index: number) => {
@@ -430,12 +563,13 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
       )
         return;
 
-      const correctIndex = getComplicatedWireSolution(
+      playSound("click");
+      const shouldCut = getComplicatedWireSolution(
         bomb.complicatedWires.wires,
-        bomb.serialNumber,
+        bomb,
       );
 
-      if (index === correctIndex) {
+      if (shouldCut[index]) {
         setBomb((b) => ({
           ...b,
           complicatedWires: { ...b.complicatedWires!, solved: true },
@@ -472,6 +606,7 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
         return;
       if (panelIndex !== bomb.wireSequences.currentPanel) return;
 
+      playSound("click");
       const panel = bomb.wireSequences.panels[panelIndex];
       const wire = panel.wires[wireIndex];
       if (wire.cut) return;
@@ -580,6 +715,17 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
 
   return (
     <div className="min-h-screen bg-zinc-900 p-4">
+      {/* Countdown overlay */}
+      {countdown !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80">
+          <div className="text-center">
+            <div className="text-9xl font-bold text-amber-500 animate-pulse">
+              {countdown}
+            </div>
+            <div className="text-xl text-zinc-400 mt-4">Get Ready...</div>
+          </div>
+        </div>
+      )}
       {strikeFlash && (
         <div className="fixed inset-0 z-40 animate-strike-flash pointer-events-none" />
       )}
@@ -620,37 +766,69 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
         </div>
 
         <div className="bg-zinc-800 rounded-xl p-4 mb-6 sticky top-0 z-30 backdrop-blur-md bg-zinc-800/95">
-          <div className="flex items-center justify-between">
-            <div className="flex gap-6">
-              <div className="bg-zinc-900 px-4 py-2 rounded">
-                <div className="text-xs text-zinc-500 mb-1">Serial Number</div>
-                <div className="text-xl font-mono text-zinc-200">
+          <div className="flex items-start justify-between gap-8">
+            {/* Left sidebar - Edgework */}
+            <div className="flex gap-8">
+              {/* Serial Number */}
+              <div className="bg-zinc-900 px-3 py-2 rounded border border-zinc-700">
+                <div className="text-xs text-zinc-500 mb-1">Serial #</div>
+                <div className="text-lg font-mono text-zinc-200 tracking-wider">
                   {bomb.serialNumber}
                 </div>
               </div>
-              <div className="bg-zinc-900 px-4 py-2 rounded">
+
+              {/* Ports */}
+              {bomb.ports.length > 0 && (
+                <div className="bg-zinc-900 px-3 py-2 rounded border border-zinc-700">
+                  <div className="text-xs text-zinc-500 mb-1">Ports</div>
+                  <div className="flex gap-2">
+                    {bomb.ports.map((port, idx) => (
+                      <img
+                        key={idx}
+                        src={PORT_IMAGES[port]}
+                        alt={port}
+                        className="h-8 w-auto opacity-90"
+                        title={port}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Indicators */}
+              {bomb.indicators.length > 0 && (
+                <div className="bg-zinc-900 px-3 py-2 rounded border border-zinc-700">
+                  <div className="text-xs text-zinc-500 mb-1">Indicators</div>
+                  <div className="flex gap-2">
+                    {bomb.indicators.map((ind, idx) => (
+                      <div
+                        key={idx}
+                        className="text-lg font-mono text-yellow-400"
+                      >
+                        {ind}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Batteries */}
+              <div className="bg-zinc-900 px-3 py-2 rounded border border-zinc-700">
                 <div className="text-xs text-zinc-500 mb-1">Batteries</div>
                 <div className="flex gap-1">
                   {Array.from({ length: bomb.batteries }).map((_, i) => (
-                    <span key={i} className="text-xl">
+                    <span key={i} className="text-lg">
                       🔋
                     </span>
                   ))}
                   {bomb.batteries === 0 && (
-                    <span className="text-zinc-600">-</span>
+                    <span className="text-zinc-600 text-lg">-</span>
                   )}
                 </div>
               </div>
-              {bomb.indicators.length > 0 && (
-                <div className="bg-zinc-900 px-4 py-2 rounded">
-                  <div className="text-xs text-zinc-500 mb-1">Indicators</div>
-                  <div className="text-xl font-mono text-yellow-400">
-                    {bomb.indicators.join(" ")}
-                  </div>
-                </div>
-              )}
             </div>
 
+            {/* Timer */}
             <div
               className={`text-5xl font-mono font-bold ${bomb.strikes > 0 ? "text-red-500 animate-pulse" : "text-green-500"}`}
             >
@@ -844,7 +1022,9 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
                   ◀
                 </button>
                 <button
-                  onClick={() => pressMorseFrequency(MORSE_FREQUENCIES[morseSelectedIndex])}
+                  onClick={() =>
+                    pressMorseFrequency(MORSE_FREQUENCIES[morseSelectedIndex])
+                  }
                   disabled={bomb.morseCode!.solved || bomb.gameOver}
                   className="h-16 px-8 rounded-lg bg-zinc-900 border-2 border-amber-500/50 hover:border-amber-400 transition-colors flex items-center justify-center"
                 >
@@ -870,58 +1050,63 @@ export default function BombContent({ initialBomb, difficulty }: Props) {
 
           {bomb.complicatedWires && (
             <div
-              className={`bg-zinc-800 rounded-xl p-6 relative ${bomb.complicatedWires.solved ? "opacity-60" : ""}`}
+              className={`bg-gradient-to-br from-zinc-800 to-zinc-900 rounded-2xl p-6 relative border-2 border-zinc-700/50 shadow-2xl ${bomb.complicatedWires.solved ? "opacity-60" : ""}`}
             >
-              <div
-                className={`absolute top-3 right-3 w-4 h-4 rounded-full ${bomb.complicatedWires.solved ? "bg-green-500" : "bg-zinc-600"}`}
-              />
-              {difficulty === "devtest" && (
-                <h2 className="text-lg font-semibold text-zinc-200 mb-4">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold text-zinc-200 tracking-wider uppercase">
                   Complicated Wires
                 </h2>
-              )}
-              <div className="space-y-3">
-                {bomb.complicatedWires.wires.map((wire, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => cutComplicatedWire(idx)}
-                    disabled={
-                      bomb.complicatedWires!.solved || bomb.gameOver || wire.cut
-                    }
-                    className={`w-full h-12 rounded-lg flex items-center px-4 relative ${
-                      wire.cut ? "opacity-50" : ""
-                    } ${
-                      wire.color === "red"
-                        ? "bg-red-600"
-                        : wire.color === "blue"
-                          ? "bg-blue-600"
-                          : wire.color === "yellow"
-                            ? "bg-yellow-500"
-                            : wire.color === "white"
-                              ? "bg-white"
-                              : "bg-neutral-950 border border-zinc-500"
-                    }`}
-                  >
-                    {wire.hasLED && (
-                      <div className="w-3 h-3 rounded-full bg-red-500 mr-2 animate-pulse" />
-                    )}
-                    <span
-                      className={`font-medium ${wire.color === "white" || wire.color === "yellow" ? "text-black" : "text-white"}`}
-                    >
-                      {idx + 1}
-                    </span>
-                    {wire.hasStar && (
-                      <span
-                        className={`ml-auto text-lg ${wire.color === "white" || wire.color === "yellow" ? "text-black" : "text-white"}`}
+              </div>
+              <div className="space-y-2">
+                {bomb.complicatedWires.wires.map((wire, idx) => {
+                  const isLightColor =
+                    wire.color === "white" || wire.color === "yellow";
+                  const isRedBlue = wire.color === "redblue";
+                  return (
+                    <div key={idx} className="flex flex-col gap-1">
+                      <div className="flex items-center justify-between px-1">
+                        <div className="flex items-center gap-2">
+                          {wire.hasLED && (
+                            <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                          )}
+                          {wire.hasStar && (
+                            <span className="text-amber-400 text-sm">★</span>
+                          )}
+                        </div>
+                        <span className="text-zinc-500 text-xs">{idx + 1}</span>
+                      </div>
+                      <button
+                        onClick={() => cutComplicatedWire(idx)}
+                        disabled={
+                          bomb.complicatedWires!.solved ||
+                          bomb.gameOver ||
+                          wire.cut
+                        }
+                        className={`w-full h-6 rounded relative ${
+                          wire.cut ? "opacity-40" : ""
+                        } ${
+                          isRedBlue
+                            ? "bg-gradient-to-r from-red-600 via-red-500 to-blue-500"
+                            : wire.color === "red"
+                              ? "bg-red-600"
+                              : wire.color === "blue"
+                                ? "bg-blue-600"
+                                : wire.color === "yellow"
+                                  ? "bg-yellow-500"
+                                  : wire.color === "white"
+                                    ? "bg-zinc-200"
+                                    : "bg-neutral-900"
+                        }`}
                       >
-                        ★
-                      </span>
-                    )}
-                    {wire.cut && (
-                      <span className="ml-auto text-black font-bold">✂</span>
-                    )}
-                  </button>
-                ))}
+                        {wire.cut && (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="w-full h-0.5 bg-black/30" />
+                          </div>
+                        )}
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
               {bomb.complicatedWires.solved && (
                 <div className="mt-4 text-green-500 font-bold text-center">
